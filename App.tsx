@@ -734,6 +734,7 @@ const Marketplace: React.FC<{
   const { categorySlug } = useParams<{ categorySlug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const filtersFromURL = useMemo(() => {
     const f: any = {};
@@ -754,27 +755,44 @@ const Marketplace: React.FC<{
   const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
 
-  const scrollRestoredRef = useRef(false);
+  const prevLocationRef = useRef<string>('');
 
+  // Vrati scroll poziciju kada se vraćaš na marketplace
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (scrollRestoredRef.current) return;
-    scrollRestoredRef.current = true;
-    const saved = sessionStorage.getItem('marketplaceScroll');
-    if (!saved) return;
-    const y = parseInt(saved, 10);
-    if (!Number.isNaN(y)) {
-      window.scrollTo(0, y);
+    const isMarketplace = location.pathname === '/marketplace' || location.pathname.startsWith('/kategorija/');
+    const wasMarketplace = prevLocationRef.current === '/marketplace' || prevLocationRef.current.startsWith('/kategorija/');
+    const comingFromAd = prevLocationRef.current.startsWith('/oglas/');
+    
+    if (isMarketplace && comingFromAd && !wasMarketplace) {
+      // Vraćaš se sa oglasa na marketplace - vrati scroll poziciju
+      const saved = sessionStorage.getItem('marketplaceScroll');
+      if (saved) {
+        const y = parseInt(saved, 10);
+        if (!Number.isNaN(y) && y > 0) {
+          // Mali delay da se DOM učita
+          setTimeout(() => window.scrollTo({ top: y, behavior: 'instant' }), 50);
+        }
+      }
     }
-  }, []);
+    
+    prevLocationRef.current = location.pathname;
+  }, [location.pathname]);
 
+  // Sačuvaj scroll poziciju kada napuštaš marketplace
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const isMarketplace = location.pathname === '/marketplace' || location.pathname.startsWith('/kategorija/');
+    
     return () => {
-      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-      sessionStorage.setItem('marketplaceScroll', String(y));
+      if (isMarketplace) {
+        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        if (y > 0) {
+          sessionStorage.setItem('marketplaceScroll', String(y));
+        }
+      }
     };
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     const m = window.matchMedia('(max-width: 1023px)');
@@ -1865,6 +1883,12 @@ const AdDetail: React.FC<{
     loadAd();
     return () => { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } };
   }, [loadAd]);
+
+  // Scroll na vrh kada se otvori oglas
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [slug]);
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
   const metrics = useMemo(() => ad ? getSellerMetrics(ad.vlasnikId) : { avg: "5.0", count: 0 }, [ad, ratings]);
