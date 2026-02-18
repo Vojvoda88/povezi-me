@@ -43,6 +43,7 @@ router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Requ
       activeAds,
       premiumAds,
       reportedAdsCount,
+      pendingAdsCount,
       revenueAgg,
       lastUsers,
       lastAds
@@ -52,6 +53,7 @@ router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Requ
       prisma.ad.count({ where: { status: AdStatus.AKTIVAN } }),
       prisma.ad.count({ where: { featuredUntil: { gt: new Date() } } }),
       prisma.report.count({ where: { status: ReportStatus.open } }),
+      prisma.ad.count({ where: { status: AdStatus.NA_CEKANJU } }),
       prisma.payment.aggregate({ where: { status: 'succeeded' }, _sum: { amount: true } }),
       prisma.user.findMany({
         take: 5,
@@ -71,6 +73,7 @@ router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Requ
       activeAds,
       premiumAds,
       reportedAds: reportedAdsCount,
+      pendingAds: pendingAdsCount,
       revenueTotal,
       lastUsers,
       lastAds

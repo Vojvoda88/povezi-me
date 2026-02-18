@@ -5,7 +5,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Flag, CreditCard, LogOut, ChevronLeft,
-  Loader2, SearchX, AlertTriangle, Trash2, Ban, Shield, Zap, ChevronRight
+  Loader2, SearchX, AlertTriangle, Trash2, Ban, Shield, Zap, ChevronRight,
+  Menu, X, Home
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
@@ -135,23 +136,56 @@ export const AdminLogin: React.FC<{ onLogin: (u: User) => void }> = ({ onLogin }
 // ----- Layout -----
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: stats } = useAdminFetch<{ pendingAds?: number }>(`${API_BASE}/admin/stats`);
+  const pendingCount = stats?.pendingAds ?? 0;
+
+  const navLinks = [
+    { to: '/admin', label: 'Dashboard' },
+    { to: '/admin/users', label: 'Korisnici' },
+    { to: '/admin/ads', label: 'Oglasi' },
+    { to: '/admin/pending', label: 'Na čekanju', badge: pendingCount },
+    { to: '/admin/reports', label: 'Prijave' },
+    { to: '/admin/payments', label: 'Plaćanja' },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-page)', color: 'var(--text-primary)' }}>
-      <header className="border-b sticky top-0 z-10 flex items-center justify-between px-4 py-3" style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)' }}>
-        <div className="flex items-center gap-4">
-          <Link to="/admin" className="font-black uppercase tracking-widest text-sm">Admin</Link>
-          <nav className="flex gap-2">
-            <Link to="/admin" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Dashboard</Link>
-            <Link to="/admin/users" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Korisnici</Link>
-            <Link to="/admin/ads" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Oglasi</Link>
-            <Link to="/admin/pending" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Na čekanju</Link>
-            <Link to="/admin/reports" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Prijave</Link>
-            <Link to="/admin/payments" className="px-3 py-2 rounded-lg text-xs font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>Plaćanja</Link>
+    <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ backgroundColor: 'var(--bg-page)', color: 'var(--text-primary)' }}>
+      <header className="border-b sticky top-0 z-20 flex items-center justify-between gap-2 px-3 sm:px-4 py-3" style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button type="button" onClick={() => setMobileMenuOpen((o) => !o)} className="lg:hidden p-2 rounded-lg shrink-0" style={{ color: 'var(--text-secondary)' }} aria-label="Meni"><Menu className="w-6 h-6" /></button>
+          <Link to="/admin" className="font-black uppercase tracking-widest text-sm truncate">Admin</Link>
+          <nav className="hidden lg:flex flex-wrap gap-1">
+            {navLinks.map(({ to, label, badge }) => (
+              <Link key={to} to={to} className="px-2 py-1.5 rounded-lg text-xs font-bold uppercase whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{label}{badge != null && badge > 0 ? <span className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full text-[10px] font-black" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>{badge}</span> : null}</Link>
+            ))}
           </nav>
         </div>
-        <button type="button" onClick={() => { localStorage.removeItem(TOKEN_KEY); navigate('/'); window.location.reload(); }} className="p-2 rounded-lg" style={{ color: 'var(--text-secondary)' }} title="Odjavi se"><LogOut className="w-5 h-5" /></button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Link to="/marketplace" className="p-2 rounded-lg flex items-center gap-1.5 text-xs font-bold uppercase" style={{ color: 'var(--accent)' }} title="Glavna stranica"><Home className="w-4 h-4" /> <span className="hidden sm:inline">Početna</span></Link>
+          <button type="button" onClick={() => { localStorage.removeItem(TOKEN_KEY); navigate('/'); window.location.reload(); }} className="p-2 rounded-lg" style={{ color: 'var(--text-secondary)' }} title="Odjavi se"><LogOut className="w-5 h-5" /></button>
+        </div>
       </header>
-      <main className="flex-1 p-4 max-w-7xl mx-auto w-full">{children}</main>
+      {/* Mobile nav panel */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-[19] bg-black/50" aria-hidden onClick={() => setMobileMenuOpen(false)} />
+      )}
+      <div className={`lg:hidden fixed top-[52px] left-0 right-0 bottom-0 z-[19] overflow-y-auto border-r transition-transform duration-200 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)', width: 'min(280px, 85vw)' }}>
+        <div className="p-4 flex flex-col gap-1">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Navigacija</span>
+            <button type="button" onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg" style={{ color: 'var(--text-secondary)' }}><X className="w-5 h-5" /></button>
+          </div>
+          <Link to="/marketplace" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm" style={{ color: 'var(--accent)' }}><Home className="w-5 h-5" /> Glavna stranica</Link>
+          {navLinks.map(({ to, label, badge }) => (
+            <Link key={to} to={to} onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
+              <span>{label}</span>
+              {badge != null && badge > 0 && <span className="inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full text-xs font-black" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>{badge}</span>}
+            </Link>
+          ))}
+        </div>
+      </div>
+      <main className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">{children}</main>
     </div>
   );
 };
@@ -159,7 +193,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 // ----- Dashboard -----
 export const AdminDashboard: React.FC = () => {
   const { data, loading, error, refetch } = useAdminFetch<{
-    totalUsers: number; totalAds: number; activeAds: number; premiumAds: number; reportedAds: number; revenueTotal: number;
+    totalUsers: number; totalAds: number; activeAds: number; premiumAds: number; reportedAds: number; pendingAds?: number; revenueTotal: number;
     lastUsers: Array<{ id: string; ime: string; email: string; createdAt: string; role: string }>;
     lastAds: Array<{ id: string; naslov: string; slug: string; createdAt: string; vlasnik: { ime: string; email: string } }>;
   }>(`${API_BASE}/admin/stats`);
@@ -176,19 +210,27 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-black uppercase tracking-widest">Dashboard</h1>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
         {[
           { label: 'Korisnici', value: s.totalUsers },
           { label: 'Oglasi', value: s.totalAds },
           { label: 'Aktivni', value: s.activeAds },
           { label: 'Premium', value: s.premiumAds },
+          { label: 'Na čekanju', value: s.pendingAds ?? 0, href: '/admin/pending' },
           { label: 'Prijave (otvorene)', value: s.reportedAds },
           { label: 'Prihodi (€)', value: s.revenueTotal }
-        ].map(({ label, value }) => (
-          <div key={label} className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-            <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-            <p className="text-xl font-bold">{value}</p>
-          </div>
+        ].map(({ label, value, href }) => (
+          href ? (
+            <Link key={label} to={href} className="p-3 sm:p-4 rounded-xl border block" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+              <p className="text-lg sm:text-xl font-bold" style={{ color: 'var(--accent)' }}>{value}</p>
+            </Link>
+          ) : (
+            <div key={label} className="p-3 sm:p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+              <p className="text-lg sm:text-xl font-bold">{value}</p>
+            </div>
+          )
         ))}
       </div>
       <div className="grid lg:grid-cols-2 gap-6">
@@ -438,24 +480,40 @@ export const AdminPendingAds: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-black uppercase tracking-widest">Odobri oglase</h1>
+      <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest">Odobri oglase</h1>
       <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Oglasi na čekanju: {total}. Odobri ih da postanu aktivni ili odbij (brisanje).</p>
       {list.length === 0 ? (
         <div className="rounded-xl border p-8 text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Nema oglasa na čekanju.</div>
       ) : (
-        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left" style={{ borderColor: 'var(--border-subtle)' }}>
-                <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Naslov</th>
-                <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Kategorija</th>
-                <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Cijena</th>
-                <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Prodavac</th>
-                <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Akcije</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((a: { id: string; naslov: string; slug: string; kategorija: string; cijena: number; vlasnik: { ime: string; email: string }; createdAt: string }) => (
+        <>
+          {/* Mobile: cards */}
+          <div className="md:hidden space-y-3">
+            {list.map((a: { id: string; naslov: string; slug: string; kategorija: string; cijena: number; vlasnik: { ime: string; email: string }; createdAt: string }) => (
+              <div key={a.id} className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+                <p className="font-medium text-sm mb-1">{a.naslov}</p>
+                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>{a.kategorija} · {Number(a.cijena)} € · {a.vlasnik?.ime}</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button type="button" onClick={() => approve(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase flex-1" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Odobri</button>
+                  <button type="button" onClick={() => reject(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij</button>
+                  <a href={`/oglas/${a.slug}`} target="_blank" rel="noopener noreferrer" className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border flex items-center justify-center" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</a>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: table */}
+          <div className="hidden md:block rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Naslov</th>
+                  <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Kategorija</th>
+                  <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Cijena</th>
+                  <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Prodavac</th>
+                  <th className="p-3 font-black uppercase text-[10px]" style={{ color: 'var(--text-secondary)' }}>Akcije</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((a: { id: string; naslov: string; slug: string; kategorija: string; cijena: number; vlasnik: { ime: string; email: string }; createdAt: string }) => (
                 <tr key={a.id} className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                   <td className="p-3 font-medium">{a.naslov}</td>
                   <td className="p-3">{a.kategorija}</td>
@@ -471,6 +529,7 @@ export const AdminPendingAds: React.FC = () => {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

@@ -540,7 +540,7 @@ const AppContent: React.FC = () => {
             <Route path="/moji-oglasi/uredi/:id" element={<RequireAuth><EditAd user={currentUser} onSaved={refreshAds} /></RequireAuth>} />
             <Route path="/moji-favoriti" element={<RequireAuth><MyFavorites ads={ads} favorites={favorites} onToggleFavorite={toggleFavorite} adsError={adsError} adsAreFallback={adsAreFallback} onRetryAds={refreshAds} /></RequireAuth>} />
             <Route path="/moje-spremljene-pretrage" element={<RequireAuth><MySavedSearches /></RequireAuth>} />
-            <Route path="/objavi" element={<AddAd user={currentUser} onAddAd={prependAd} onPublishSuccess={refreshAds} />} />
+            <Route path="/objavi" element={<RequireAuth><AddAd user={currentUser} onAddAd={prependAd} onPublishSuccess={refreshAds} /></RequireAuth>} />
             <Route path="/poruke" element={SHOW_CHAT ? <RequireAuth><Chat user={currentUser} ads={ads} conversations={conversations} setConversations={setConversations} messages={messages} setMessages={setMessages} setNotifications={setNotifications} onRefreshNotifications={fetchNotifications} onMarkMessageNotificationsRead={markMessageNotificationsReadForConversation} /></RequireAuth> : <Navigate to="/marketplace" replace />} />
             <Route path="/pravila" element={<LegalPage title="Pravila korištenja" content={PRAVILA_CONTENT} />} />
             <Route path="/privatnost" element={<LegalPage title="Politika privatnosti" content={PRIVATNOST_CONTENT} />} />
@@ -659,8 +659,10 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
               <button type="button" onClick={() => setMenuOpen(false)} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--text-secondary)' }}><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-2">
+              <MenuLink to="/marketplace" icon={<ArrowLeft className="w-4 h-4" />} label="Glavna stranica" onClick={() => setMenuOpen(false)} />
               {user ? (
                 <>
+                  <MenuLink to="/objavi" icon={<PlusCircle className="w-4 h-4" />} label="Objavi oglas" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-oglasi" icon={<LayoutDashboard className="w-4 h-4" />} label="Moji Oglasi" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-favoriti" icon={<Heart className="w-4 h-4" />} label="Sačuvano" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moje-spremljene-pretrage" icon={<Bookmark className="w-4 h-4" />} label="Spremljene pretrage" onClick={() => setMenuOpen(false)} />
@@ -3038,10 +3040,10 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       cijena: Number(cijena),
       kategorija: category,
       lokacija: formData.lokacija,
-      potkategorija: isMotornaVozila && vehicleSubcategory ? vehicleSubcategory : (formData.premium ? 'Premium' : 'Basic'),
+      potkategorija: isMotornaVozila && vehicleSubcategory ? vehicleSubcategory : undefined,
       tipOglasa,
       details: details || undefined,
-      images: imageUrls
+      images: imageUrls.map((url: string) => ({ url })),
     };
     if (isMotornaVozila && vehicleSubcategory && Object.keys(vDetails).length > 0) {
       const specs: Record<string, unknown> = {};
