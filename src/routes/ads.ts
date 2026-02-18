@@ -9,7 +9,7 @@ import prisma from '../lib/prisma';
 import { getSupabase, BUCKET_ADS } from '../lib/supabase';
 import { extractStoragePath, cleanupTmpUploads } from '../lib/storage';
 import { sanitizeHTML } from '../lib/sanitize';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { verifyCaptcha } from '../lib/captcha';
 import { z } from 'zod';
 import {
@@ -734,14 +734,18 @@ router.get('/similar/:slug', (async (req: Request, res: Response) => {
 }) as any);
 
 /**
- * GET single ad by slug – view throttle DB-backed (30 min), multi-instance safe
+ * GET single ad by slug – view throttle DB-backed (30 min), multi-instance safe.
+ * Admin (authenticated) may view pending (NA_CEKANJU) ads for moderation.
  */
-router.get('/:slug', (async (req: Request, res: Response) => {
+router.get('/:slug', optionalAuthenticate as any, (async (req: Request, res: Response) => {
   const r = req as any;
   const s = res as any;
   const slug = r.params.slug;
   if (!slug) return s.status(400).json({ error: 'Slug je obavezan' });
-  const where = { slug, status: AdStatus.AKTIVAN, deletedAt: null };
+  const isAdmin = r.user?.role === 'ADMIN';
+  const where = isAdmin
+    ? { slug, deletedAt: null }
+    : { slug, status: AdStatus.AKTIVAN, deletedAt: null };
   const userId = r.user?.userId ?? null;
   const ip = r.ip ?? r.connection?.remoteAddress ?? undefined;
   const key = viewThrottleKey(userId, ip);

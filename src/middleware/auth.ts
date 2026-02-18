@@ -47,6 +47,41 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   }
 };
 
+/** Optional auth: no token or invalid token → next() without req.user; valid token → req.user set. Never returns 401. */
+export const optionalAuthenticate: RequestHandler = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
+  if (!token) {
+    next();
+    return;
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (typeof decoded !== 'object' || decoded === null) {
+      next();
+      return;
+    }
+    const payload = decoded as { userId: string; role: string; email?: string };
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, banned: true },
+    });
+    if (!user || user.banned) {
+      next();
+      return;
+    }
+    (req as any).user = {
+      id: payload.userId,
+      userId: payload.userId,
+      role: payload.role as 'USER' | 'ADMIN',
+      email: payload.email,
+    };
+  } catch {
+    // token invalid or expired – continue as unauthenticated
+  }
+  next();
+};
+
 export const requireAdmin: RequestHandler = (req, res, next) => {
   if (req.user?.role !== 'ADMIN') {
     res.status(403).json({ error: 'Pristup zabranjen: Samo za administratore' });

@@ -367,6 +367,29 @@ const AppContent: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [pendingAdminCount, setPendingAdminCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'admin') {
+      setPendingAdminCount(0);
+      return;
+    }
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    let cancelled = false;
+    const fetchPending = () => {
+      fetch(`${API_BASE}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.ok ? res.json() : null)
+        .then((data: { pendingAds?: number } | null) => {
+          if (!cancelled && data != null && typeof data.pendingAds === 'number')
+            setPendingAdminCount(data.pendingAds);
+        })
+        .catch(() => {});
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [currentUser?.role]);
 
   useEffect(() => {
     document.body.dataset.theme = theme;
@@ -522,7 +545,7 @@ const AppContent: React.FC = () => {
       <ErrorBoundary>
       <div className="min-h-[100dvh] flex flex-col overflow-x-hidden font-inter" style={{ backgroundColor: 'var(--bg-page)', color: 'var(--text-primary)' }}>
         <WelcomeScreen />
-        <Header user={currentUser} notifications={notifications} favoritesCount={favorites.length} onLogout={handleLogout} theme={theme} onThemeChange={setTheme} mobileSearchOpen={mobileSearchOpen} onMobileSearchOpenChange={setMobileSearchOpen} />
+        <Header user={currentUser} notifications={notifications} favoritesCount={favorites.length} onLogout={handleLogout} theme={theme} onThemeChange={setTheme} mobileSearchOpen={mobileSearchOpen} onMobileSearchOpenChange={setMobileSearchOpen} pendingAdminCount={pendingAdminCount} />
         <main className="flex-grow pt-16 lg:pt-24 pb-24 lg:pb-0">
           <Routes>
             <Route path="/mobile-preview" element={<Navigate to="/?mobile=1" replace />} />
@@ -586,13 +609,14 @@ const App: React.FC = () => (
   </Router>
 );
 
-const Header: React.FC<{ user: User | null, notifications: Notification[], favoritesCount: number, onLogout: () => void, theme: ThemeId, onThemeChange: (t: ThemeId) => void, mobileSearchOpen?: boolean, onMobileSearchOpenChange?: (open: boolean) => void }> = ({ user, notifications, favoritesCount, onLogout, theme, onThemeChange, mobileSearchOpen = false, onMobileSearchOpenChange }) => {
+const Header: React.FC<{ user: User | null, notifications: Notification[], favoritesCount: number, onLogout: () => void, theme: ThemeId, onThemeChange: (t: ThemeId) => void, mobileSearchOpen?: boolean, onMobileSearchOpenChange?: (open: boolean) => void, pendingAdminCount?: number }> = ({ user, notifications, favoritesCount, onLogout, theme, onThemeChange, mobileSearchOpen = false, onMobileSearchOpenChange, pendingAdminCount = 0 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const unreadCount = notifications.filter(n => !n.procitano).length;
+  const hasPendingAds = user?.role === 'admin' && pendingAdminCount > 0;
 
   useEffect(() => { setSearchValue(searchParams.get('q') || ""); }, [searchParams]);
   useEffect(() => { if (mobileSearchOpen) searchInputRef.current?.focus(); }, [mobileSearchOpen]);
@@ -634,7 +658,16 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
           </button>
           <Link to="/objavi" className="hidden lg:flex h-11 text-white px-5 rounded-xl items-center gap-2 font-black uppercase text-[10px] transition-colors" style={{ backgroundColor: 'var(--accent)' }}><PlusCircle className="w-4 h-4" /> Objavi Oglas</Link>
           {user?.role === 'admin' && (
-            <Link to="/admin" className="hidden lg:flex h-10 lg:h-11 px-3 lg:px-4 rounded-xl items-center gap-2 font-bold text-[10px] lg:text-xs uppercase border transition-colors" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }} title="Admin panel"><ShieldCheck className="w-4 h-4" /> Admin</Link>
+            <>
+              {hasPendingAds && (
+                <Link to="/admin/pending" className="hidden lg:flex h-10 lg:h-11 px-3 lg:px-4 rounded-xl items-center gap-2 font-bold text-[10px] lg:text-xs uppercase border relative" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'rgba(79, 109, 255, 0.12)' }} title={`${pendingAdminCount} oglasa na čekanju`}>
+                  <Bell className="w-4 h-4" />
+                  <span>Na čekanju</span>
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount}</span>
+                </Link>
+              )}
+              <Link to="/admin" className="hidden lg:flex h-10 lg:h-11 px-3 lg:px-4 rounded-xl items-center gap-2 font-bold text-[10px] lg:text-xs uppercase border transition-colors relative" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }} title="Admin panel"><ShieldCheck className="w-4 h-4" /> Admin{hasPendingAds ? <span className="ml-0.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount}</span> : null}</Link>
+            </>
           )}
           {SHOW_CHAT && user && <Link to="/poruke" className="p-2 rounded-xl hidden lg:block transition-colors hover:opacity-80" style={{ color: 'var(--text-secondary)' }} title="Poruke"><MessageCircle className="w-5 h-5" /></Link>}
           {user && (
@@ -688,7 +721,10 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
                 </>
               )}
               {user?.role === 'admin' && (
-                <MenuLink to="/admin" icon={<ShieldCheck className="w-4 h-4" />} label="Admin panel" onClick={() => setMenuOpen(false)} />
+                <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex items-center justify-between gap-3 p-3 font-bold rounded-xl transition-all" style={{ color: 'var(--text-primary)' }}>
+                  <span className="flex items-center gap-3"><span style={{ color: 'var(--accent)' }}><ShieldCheck className="w-4 h-4" /></span> Admin panel</span>
+                  {hasPendingAds && <span className="min-w-[22px] h-6 px-2 flex items-center justify-center rounded-full text-xs font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount} na čekanju</span>}
+                </Link>
               )}
             </div>
           </div>
@@ -1875,7 +1911,7 @@ const AdDetail: React.FC<{
     setFetchError(false);
     const base = (API_BASE || '').replace(/\/+$/, '');
     const url = `${base}/ads/${encodeURIComponent(slug)}`;
-    fetch(url, { signal: ctrl.signal })
+    fetch(url, { signal: ctrl.signal, headers: getAuthHeaders() })
       .then(res => res.ok ? res.json() : null)
       .then((data: any) => {
         if (ctrl.signal.aborted) return;
