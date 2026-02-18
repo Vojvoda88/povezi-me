@@ -3093,6 +3093,18 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     }
   };
 
+  const vehicleFieldsConfig = useMemo(() => {
+    if (category !== MOTORNA_VOZILA_ID || !vehicleSubcategory) return null;
+    const cfg = (VEHICLE_FIELDS_CONFIG as Record<string, Record<string, unknown>>)[vehicleSubcategory];
+    return cfg ?? null;
+  }, [category, vehicleSubcategory]);
+
+  useEffect(() => {
+    if (submitError && submitErrorRef.current) {
+      submitErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [submitError]);
+
   if (step === 1 || !category) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 animate-slide-up">
@@ -3108,14 +3120,6 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       </div>
     );
   }
-
-  const vehicleFieldsConfig = category === MOTORNA_VOZILA_ID && vehicleSubcategory ? (VEHICLE_FIELDS_CONFIG as Record<string, Record<string, unknown>>)[vehicleSubcategory] : null;
-
-  useEffect(() => {
-    if (submitError && submitErrorRef.current) {
-      submitErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [submitError]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-slide-up">
