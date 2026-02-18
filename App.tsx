@@ -44,6 +44,28 @@ const TOKEN_KEY = 'povezi_access_token';
 /** Ključ za spremanje scroll pozicije liste oglasa (povratak sa detail stranice). */
 const ADS_LIST_SCROLL_KEY = 'adsListScrollY';
 
+/** Vraća element koji stvarno skroluje: [data-scroll-root] ako postoji, inače window. */
+function getScrollElement(): Window | HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  const el = document.querySelector('[data-scroll-root]');
+  if (el && el instanceof HTMLElement) return el;
+  return typeof window !== 'undefined' ? window : null;
+}
+
+function getScrollTop(container: Window | HTMLElement | null): number {
+  if (!container) return 0;
+  if (container === window) return (window.scrollY ?? (window as any).pageYOffset ?? 0);
+  return (container as HTMLElement).scrollTop;
+}
+
+function setScrollTop(container: Window | HTMLElement | null, value: number): void {
+  if (!container) return;
+  try {
+    if (container === window) window.scrollTo({ top: value, left: 0, behavior: 'auto' });
+    else (container as HTMLElement).scrollTop = value;
+  } catch (_) {}
+}
+
 /** Chat uključen – linkovi Poruke u headeru i "Poruka prodavcu" na stranici oglasa */
 const SHOW_CHAT = true;
 
@@ -547,7 +569,8 @@ const AppContent: React.FC = () => {
       <div className="min-h-[100dvh] flex flex-col overflow-x-hidden font-inter" style={{ backgroundColor: 'var(--bg-page)', color: 'var(--text-primary)' }}>
         <WelcomeScreen />
         <Header user={currentUser} notifications={notifications} favoritesCount={favorites.length} onLogout={handleLogout} theme={theme} onThemeChange={setTheme} mobileSearchOpen={mobileSearchOpen} onMobileSearchOpenChange={setMobileSearchOpen} pendingAdminCount={pendingAdminCount} />
-        <main className="flex-grow pt-16 lg:pt-24 pb-24 lg:pb-0">
+        <main className="flex-grow flex flex-col min-h-0 pt-16 lg:pt-24 pb-24 lg:pb-0">
+          <div data-scroll-root className="flex-1 overflow-y-auto min-h-0">
           <Routes>
             <Route path="/mobile-preview" element={<Navigate to="/?mobile=1" replace />} />
             <Route path="/" element={<Navigate to="/marketplace" replace />} />
@@ -573,6 +596,7 @@ const AppContent: React.FC = () => {
             <Route path="/reset-lozinke" element={<ResetLozinkePage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </div>
         </main>
         
         <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[1000] px-1 py-1.5 pb-safe shadow-lg border-t transition-colors flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -831,10 +855,13 @@ const Marketplace: React.FC<{
       try {
         if (pendingScrollYRef.current == null || windowApplied) return;
         const savedY = pendingScrollYRef.current;
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollEl = getScrollElement();
+        const maxScroll = scrollEl && scrollEl !== window
+          ? (scrollEl as HTMLElement).scrollHeight - (scrollEl as HTMLElement).clientHeight
+          : document.documentElement.scrollHeight - window.innerHeight;
         if (maxScroll > 0) {
           const y = Math.min(savedY, Math.max(0, maxScroll));
-          window.scrollTo(0, y);
+          setScrollTop(scrollEl, y);
         }
         windowApplied = true;
         pendingScrollYRef.current = null;
@@ -876,19 +903,27 @@ const Marketplace: React.FC<{
     };
   }, [adsLoading, ads.length]);
 
-  // Spremi scroll poziciju na scroll event (window + VirtualList ako korisnik skrola listu)
+  // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const save = () => {
       try {
-        const wy = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        const wy = getScrollTop(getScrollElement());
         const ly = virtualListScrollRef.current;
         if (wy >= 0 || ly > 0)
           sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
       } catch (_) {}
     };
-    window.addEventListener('scroll', save, { passive: true });
-    return () => window.removeEventListener('scroll', save);
+    const scrollEl = getScrollElement();
+    if (scrollEl) {
+      if (scrollEl === window) {
+        window.addEventListener('scroll', save, { passive: true });
+        return () => window.removeEventListener('scroll', save);
+      }
+      scrollEl.addEventListener('scroll', save, { passive: true });
+      return () => scrollEl.removeEventListener('scroll', save);
+    }
+    return () => {};
   }, []);
 
   // Pri unmountu: backup spremanje scroll pozicije
@@ -896,7 +931,7 @@ const Marketplace: React.FC<{
     if (typeof window === 'undefined') return;
     return () => {
       try {
-        const wy = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        const wy = getScrollTop(getScrollElement());
         const ly = virtualListScrollRef.current;
         if (wy >= 0 || ly >= 0)
           sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
@@ -1103,7 +1138,8 @@ const Marketplace: React.FC<{
 
   const saveScrollBeforeNavigate = useCallback(() => {
     try {
-      const wy = Math.round(typeof window.scrollY === 'number' ? window.scrollY : (window as any).pageYOffset || 0);
+      const scrollEl = getScrollElement();
+      const wy = Math.round(getScrollTop(scrollEl));
       const ly = Math.round(virtualListScrollRef.current);
       sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: wy, l: ly }));
     } catch (_) {}
@@ -1864,7 +1900,7 @@ const AdCardInner: React.FC<{
           onBeforeNavigate?.();
           try {
             if (typeof window !== 'undefined' && !onBeforeNavigate) {
-              const y = Math.round(window.scrollY ?? window.pageYOffset ?? 0);
+              const y = Math.round(getScrollTop(getScrollElement()));
               sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
             }
           } catch (_) {}
@@ -1974,16 +2010,30 @@ const AdDetail: React.FC<{
     return () => { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } };
   }, [loadAd]);
 
-  // Detail stranica: uvijek kreni od vrha; isključi browser scroll restoration
+  // Detail stranica: obavezno resetuj scroll na vrh (scroll root ili window) pri svakom otvaranju oglasa
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const resetScroll = () => {
+      try {
+        const el = getScrollElement();
+        setScrollTop(el, 0);
+      } catch (_) {}
+    };
     try {
       if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-      const raf = requestAnimationFrame(() => {
-        try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_) {}
-      });
-      return () => cancelAnimationFrame(raf);
+      resetScroll();
+      const raf = requestAnimationFrame(resetScroll);
+      const t0 = setTimeout(resetScroll, 0);
+      const t1 = setTimeout(resetScroll, 50);
+      const t2 = setTimeout(resetScroll, 150);
+      const t3 = setTimeout(resetScroll, 300);
+      return () => {
+        cancelAnimationFrame(raf);
+        clearTimeout(t0);
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     } catch (_) { /* zaštita od crasha */ }
   }, [slug]);
 
@@ -3912,5 +3962,7 @@ const Footer = () => (
     <p className="text-[10px] mt-6 uppercase tracking-[0.2em] font-bold opacity-60" style={{ color: 'var(--text-secondary)' }}>© 2024 Poveži.ME Premium Marketplace</p>
   </footer>
 );
+
+export default App;
 
 export default App;
