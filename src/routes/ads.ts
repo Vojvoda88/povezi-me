@@ -767,7 +767,8 @@ router.get('/:slug', optionalAuthenticate as any, (async (req: Request, res: Res
     if (doIncrement) {
       await prisma.ad.update({ where: { id: ad.id }, data: { pogledi: { increment: 1 } } });
     }
-    s.json({ ...ad, pogledi: ad.pogledi + (doIncrement ? 1 : 0) });
+    const payload = { ...ad, pogledi: ad.pogledi + (doIncrement ? 1 : 0), cijena: Number(ad.cijena) };
+    s.json(payload);
   } catch (err) {
     console.error('Ad by slug error:', err);
     s.status(500).json({ error: 'Greška pri preuzimanju oglasa' });

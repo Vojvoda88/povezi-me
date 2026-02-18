@@ -1872,7 +1872,7 @@ const AdDetail: React.FC<{
           setAdFromApi(mapApiAdToAd(data));
         } catch (e) {
           console.error('[AdDetail] mapApiAdToAd error:', e);
-          if (!ctrl.signal.aborted) setAdFromApi(null);
+          if (!ctrl.signal.aborted) { setAdFromApi(null); setFetchError(true); }
         }
       })
       .catch((err) => {
@@ -1901,7 +1901,8 @@ const AdDetail: React.FC<{
   }, [slug]);
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
-  const metrics = useMemo(() => ad ? getSellerMetrics(ad.vlasnikId) : { avg: "5.0", count: 0 }, [ad, ratings]);
+  const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
+  const metrics = useMemo(() => ad ? getSellerMetrics(safeVlasnikId || '') : { avg: "5.0", count: 0 }, [ad, safeVlasnikId, ratings]);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
 
   useEffect(() => {
@@ -1991,9 +1992,9 @@ const AdDetail: React.FC<{
              {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getProxiedImageUrl(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
           </div>
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(ad.createdAt)}</span></div>
+            <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
             <h1 className="text-3xl lg:text-4xl font-black text-white uppercase tracking-tight leading-tight">{ad.naslov}</h1>
-            <div className="text-4xl font-black text-[#7C8CFF] tracking-tighter">{ad.cijena.toLocaleString()} €</div>
+            <div className="text-4xl font-black text-[#7C8CFF] tracking-tighter">{(Number(ad.cijena) || 0).toLocaleString()} €</div>
           </div>
           {(ad.kategorija === 'nekretnine' && ad.realEstateDetails) ? (
           <div className="space-y-4 pt-4 border-t border-white/5">
@@ -2032,7 +2033,7 @@ const AdDetail: React.FC<{
              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Opis oglasa</h3>
              <div className="bg-[#131C2B] border border-white/5 p-6 lg:p-8 rounded-xl shadow-xl"><p className="text-[#F3F4F6] leading-relaxed whitespace-pre-wrap text-sm lg:text-base opacity-90">{ad.opis != null ? String(ad.opis) : ''}</p></div>
           </div>
-          {!isOwner && <RatingSection sellerId={ad.vlasnikId} user={user} onAddRating={onAddRating} metrics={metrics} />}
+          {!isOwner && <RatingSection sellerId={safeVlasnikId} user={user} onAddRating={onAddRating} metrics={metrics} />}
         </div>
         <div className="lg:col-span-4 space-y-6">
            <div className="lg:sticky lg:top-28 space-y-6">
@@ -2114,7 +2115,7 @@ const AdDetail: React.FC<{
               <div className="bg-[#131C2B] border border-white/5 rounded-xl p-8 shadow-2xl relative overflow-hidden group">
                  <div className="space-y-6">
                     <div className="flex items-center gap-5"><div className="w-20 h-20 bg-gradient-to-br from-[#4F6DFF] to-[#7C8CFF] rounded-full flex items-center justify-center font-black text-white text-3xl shadow-xl border-4 border-[#0B1220]">{getInitial((ad.details as any)?.imeProdavca ?? ad.kontaktIme)}</div><div><div className="text-white font-black text-xl flex items-center gap-2 mb-1">{(ad.details as any)?.imeProdavca ?? ad.kontaktIme}<ShieldCheck className="w-5 h-5 text-emerald-400" /></div><div className="flex items-center gap-1.5"><div className="flex text-amber-400">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-20'}`} />)}</div><span className="text-[10px] text-white/50 font-black uppercase tracking-widest">{metrics.avg} ({metrics.count})</span></div></div></div>
-                    <div className="space-y-2"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><MapPin className="w-3 h-3 text-[#4F6DFF]" /> Lokacija</span><span className="text-white">{ad.lokacija}</span></div><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><LayoutDashboard className="w-3 h-3 text-[#4F6DFF]" /> Aktivni oglasi</span><span className="text-white">{sellerAdsCount}</span></div>{user && sellerAdsCount > 0 && (<Link to={`/prodavac/${ad.vlasnikId}`} className="block w-full h-12 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 font-bold uppercase text-[10px] hover:bg-white/5 transition-all"><LayoutDashboard className="w-4 h-4" /> Pogledaj sve oglase</Link>)}</div>
+                    <div className="space-y-2"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><MapPin className="w-3 h-3 text-[#4F6DFF]" /> Lokacija</span><span className="text-white">{ad.lokacija}</span></div><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><LayoutDashboard className="w-3 h-3 text-[#4F6DFF]" /> Aktivni oglasi</span><span className="text-white">{sellerAdsCount}</span></div>{user && sellerAdsCount > 0 && safeVlasnikId && (<Link to={`/prodavac/${safeVlasnikId}`} className="block w-full h-12 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 font-bold uppercase text-[10px] hover:bg-white/5 transition-all"><LayoutDashboard className="w-4 h-4" /> Pogledaj sve oglase</Link>)}</div>
                     {(() => {
                     const telefon = (ad.details as any)?.telefonProdavca ?? ad.kontaktTelefon;
                     const hasTelefon = telefon != null && String(telefon).trim() !== '';
@@ -2200,11 +2201,12 @@ const AdDetail: React.FC<{
 };
 
 const SpecGrid = ({ details }: { details: any }) => {
+  if (!details || typeof details !== 'object') return null;
   const specs = [];
   if (details.marka) specs.push({ label: 'Marka', value: details.marka });
   if (details.model) specs.push({ label: 'Model', value: details.model });
   if (details.godiste) specs.push({ label: 'Godište', value: `${details.godiste}. god` });
-  if (details.kilometraza) specs.push({ label: 'Kilometraža', value: `${details.kilometraza.toLocaleString()} km` });
+  if (details.kilometraza != null) specs.push({ label: 'Kilometraža', value: `${(Number(details.kilometraza) || 0).toLocaleString()} km` });
   if (details.gorivo) specs.push({ label: 'Gorivo', value: details.gorivo });
   if (details.mjenjac) specs.push({ label: 'Mjenjač', value: details.mjenjac });
   if (details.snaga) specs.push({ label: 'Snaga', value: `${details.snaga} KS` });

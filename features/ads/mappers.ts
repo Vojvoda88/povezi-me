@@ -141,6 +141,9 @@ export const mapApiAdToAd = (raw: any): Ad => {
     };
   }
 
+  const vlasnikId = a.vlasnikId != null ? String(a.vlasnikId) : (a.vlasnik?.id != null ? String(a.vlasnik.id) : '');
+  const status = (a.status && typeof a.status === 'string') ? a.status : 'AKTIVAN';
+
   return {
     ...a,
     id,
@@ -149,6 +152,8 @@ export const mapApiAdToAd = (raw: any): Ad => {
     slikeThumbs,
     createdAt,
     cijena,
+    vlasnikId,
+    status,
     potkategorija: a.potkategorija || 'Basic',
     tipOglasa: a.tipOglasa || undefined,
     realEstateDetails,
