@@ -1,5 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { flushSync, createPortal } from 'react-dom';
+import {
+  scrollToTop,
+  getScrollRoot,
+  getScrollTop,
+  restoreScroll,
+  getListRouteKey,
+  saveScrollForList,
+  loadAndClearScrollForList,
+} from './lib/scroll';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
   Search, X, PlusCircle, MapPin, Filter, Star, Eye, Phone, LayoutDashboard,
@@ -41,31 +50,6 @@ import { mapApiAdToAd } from './features/ads/mappers';
 import { io, type Socket } from 'socket.io-client';
 const API_BASE = getApiBase();
 const TOKEN_KEY = 'povezi_access_token';
-/** Ključ za spremanje scroll pozicije liste oglasa (povratak sa detail stranice). */
-const ADS_LIST_SCROLL_KEY = 'adsListScrollY';
-
-/** Vraća element koji stvarno skroluje: [data-scroll-root] ako postoji, inače window. */
-function getScrollElement(): Window | HTMLElement | null {
-  if (typeof document === 'undefined') return null;
-  const el = document.querySelector('[data-scroll-root]');
-  if (el && el instanceof HTMLElement) return el;
-  return typeof window !== 'undefined' ? window : null;
-}
-
-function getScrollTop(container: Window | HTMLElement | null): number {
-  if (!container) return 0;
-  if (container === window) return (window.scrollY ?? (window as any).pageYOffset ?? 0);
-  return (container as HTMLElement).scrollTop;
-}
-
-function setScrollTop(container: Window | HTMLElement | null, value: number): void {
-  if (!container) return;
-  try {
-    if (container === window) window.scrollTo({ top: value, left: 0, behavior: 'auto' });
-    else (container as HTMLElement).scrollTop = value;
-  } catch (_) {}
-}
-
 /** Chat uključen – linkovi Poruke u headeru i "Poruka prodavcu" na stranici oglasa */
 const SHOW_CHAT = true;
 
@@ -550,6 +534,10 @@ const AppContent: React.FC = () => {
   const isMobileView = searchParams.get('mobile') === '1';
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+  }, []);
+
+  useEffect(() => {
     const meta = document.querySelector('meta[name=viewport]');
     if (!meta) return;
     if (isMobileView) meta.setAttribute('content', 'width=375, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
@@ -833,25 +821,16 @@ const Marketplace: React.FC<{
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const saved = sessionStorage.getItem(ADS_LIST_SCROLL_KEY) || sessionStorage.getItem('marketplaceScroll');
+      const listKey = getListRouteKey(location.pathname, location.search);
+      const saved = loadAndClearScrollForList(listKey);
       if (!saved) return;
-      let windowY: number;
-      let listY: number | undefined;
-      if (saved.startsWith('{')) {
-        const parsed = JSON.parse(saved) as { w?: number; l?: number };
-        windowY = typeof parsed.w === 'number' && parsed.w >= 0 ? parsed.w : 0;
-        listY = typeof parsed.l === 'number' && parsed.l >= 0 ? parsed.l : undefined;
-      } else {
-        const y = parseInt(saved, 10);
-        windowY = !Number.isNaN(y) && y >= 0 ? y : 0;
-      }
-      pendingScrollYRef.current = windowY;
-      if (listY != null) pendingListScrollRef.current = listY;
-      if (windowY > 0 || (listY != null && listY > 0)) {
+      pendingScrollYRef.current = saved.y;
+      if (saved.virtualOffset != null) pendingListScrollRef.current = saved.virtualOffset;
+      if (saved.y > 0 || (saved.virtualOffset != null && saved.virtualOffset > 0)) {
         if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       }
     } catch (_) { /* sessionStorage može biti onemogućen */ }
-  }, []);
+  }, [location.pathname, location.search]);
 
   // Vrati scroll nakon što se lista renderuje (window + eventualno VirtualList)
   useEffect(() => {
@@ -865,13 +844,13 @@ const Marketplace: React.FC<{
       try {
         if (pendingScrollYRef.current == null || windowApplied) return;
         const savedY = pendingScrollYRef.current;
-        const scrollEl = getScrollElement();
+        const scrollEl = getScrollRoot();
         const maxScroll = scrollEl && scrollEl !== window
           ? (scrollEl as HTMLElement).scrollHeight - (scrollEl as HTMLElement).clientHeight
           : document.documentElement.scrollHeight - window.innerHeight;
         if (maxScroll > 0) {
           const y = Math.min(savedY, Math.max(0, maxScroll));
-          setScrollTop(scrollEl, y);
+          restoreScroll(y);
         }
         windowApplied = true;
         pendingScrollYRef.current = null;
@@ -893,7 +872,7 @@ const Marketplace: React.FC<{
       applyWindow();
       applyList();
       if (pendingScrollYRef.current == null && pendingListScrollRef.current == null) {
-        try { sessionStorage.removeItem(ADS_LIST_SCROLL_KEY); sessionStorage.removeItem('marketplaceScroll'); } catch (_) {}
+        /* key već obrisan u loadAndClearScrollForList */
       }
     };
 
@@ -918,13 +897,14 @@ const Marketplace: React.FC<{
     if (typeof window === 'undefined') return;
     const save = () => {
       try {
-        const wy = getScrollTop(getScrollElement());
+        const wy = getScrollTop();
         const ly = virtualListScrollRef.current;
+        const listKey = getListRouteKey(location.pathname, location.search);
         if (wy >= 0 || ly > 0)
-          sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
+          saveScrollForList(listKey, ly);
       } catch (_) {}
     };
-    const scrollEl = getScrollElement();
+    const scrollEl = getScrollRoot();
     if (scrollEl) {
       if (scrollEl === window) {
         window.addEventListener('scroll', save, { passive: true });
@@ -941,10 +921,11 @@ const Marketplace: React.FC<{
     if (typeof window === 'undefined') return;
     return () => {
       try {
-        const wy = getScrollTop(getScrollElement());
+        const wy = getScrollTop();
         const ly = virtualListScrollRef.current;
+        const listKey = getListRouteKey(location.pathname, location.search);
         if (wy >= 0 || ly >= 0)
-          sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
+          saveScrollForList(listKey, ly);
       } catch (_) {}
     };
   }, []);
@@ -1148,12 +1129,10 @@ const Marketplace: React.FC<{
 
   const saveScrollBeforeNavigate = useCallback(() => {
     try {
-      const scrollEl = getScrollElement();
-      const wy = Math.round(getScrollTop(scrollEl));
-      const ly = Math.round(virtualListScrollRef.current);
-      sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: wy, l: ly }));
+      const listKey = getListRouteKey(location.pathname, location.search);
+      saveScrollForList(listKey, Math.round(virtualListScrollRef.current));
     } catch (_) {}
-  }, []);
+  }, [location.pathname, location.search]);
 
   const searchParamsRef = useRef(searchParams);
   const filtersRef = useRef(filters);
@@ -1858,6 +1837,7 @@ const AdCardInner: React.FC<{
   /** Poziva se prije navigacije na oglas (npr. da se spremi scroll pozicija liste). */
   onBeforeNavigate?: () => void;
 }> = ({ ad, isFavorite, onToggleFavorite, linksDisabled, onFallbackClick, debugAdsError, debugAdsAreFallback, imgWidth = 400, fetchPriority = 'low', onBeforeNavigate }) => {
+  const location = useLocation();
   const now = Date.now();
   const isPremium = ad.isPaid && ad.promotionStatus === "active" && ad.promotedUntil !== null && ad.promotedUntil > now;
   const hasSlug = !!ad.slug && typeof ad.slug === 'string';
@@ -1925,12 +1905,11 @@ const AdCardInner: React.FC<{
         className={className}
         onClick={() => {
           onBeforeNavigate?.();
-          try {
-            if (typeof window !== 'undefined' && !onBeforeNavigate) {
-              const y = Math.round(getScrollTop(getScrollElement()));
-              sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
-            }
-          } catch (_) {}
+          if (typeof window !== 'undefined' && !onBeforeNavigate) {
+            try {
+              saveScrollForList(getListRouteKey(location.pathname, location.search));
+            } catch (_) {}
+          }
           if (import.meta.env?.DEV) {
             console.log('[AdCard]', 'link clicked', { id: ad.id, slug: ad.slug, to });
           }
@@ -2076,6 +2055,27 @@ export const AdDetailView: React.FC<{
     setPageMeta(`${ad.naslov} - Poveži.ME`, desc, img ? getProxiedImageUrl(img) : undefined, typeof window !== 'undefined' ? window.location.href : undefined);
     return () => setPageMeta('Poveži.ME - Premium Marketplace', DEFAULT_DESCRIPTION);
   }, [ad?.id, ad?.naslov, ad?.opis, ad?.slike, setPageMeta]);
+
+  // Detail uvijek krene od vrha – public i admin
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const routeKey = ad?.slug || ad?.id;
+    if (!routeKey) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    scrollToTop();
+    const raf = requestAnimationFrame(scrollToTop);
+    const t0 = setTimeout(scrollToTop, 0);
+    const t1 = setTimeout(scrollToTop, 50);
+    const t2 = setTimeout(scrollToTop, 150);
+    const t3 = setTimeout(scrollToTop, 300);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t0);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [ad?.slug, ad?.id]);
 
   const getImageSrc = (url: string): string => {
     if (fullyFailedUrls.has(url)) return TRANSPARENT_1X1;
@@ -2393,33 +2393,6 @@ const AdDetail: React.FC<{
     return () => { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } };
   }, [loadAd]);
 
-  // Detail stranica: obavezno resetuj scroll na vrh (scroll root ili window) pri svakom otvaranju oglasa
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const resetScroll = () => {
-      try {
-        const el = getScrollElement();
-        setScrollTop(el, 0);
-      } catch (_) {}
-    };
-    try {
-      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-      resetScroll();
-      const raf = requestAnimationFrame(resetScroll);
-      const t0 = setTimeout(resetScroll, 0);
-      const t1 = setTimeout(resetScroll, 50);
-      const t2 = setTimeout(resetScroll, 150);
-      const t3 = setTimeout(resetScroll, 300);
-      return () => {
-        cancelAnimationFrame(raf);
-        clearTimeout(t0);
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    } catch (_) { /* zaštita od crasha */ }
-  }, [slug]);
-
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
 
@@ -2508,11 +2481,26 @@ const AdDetail: React.FC<{
 };
 
 const PublicProfile: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: (id: string) => void, adsError?: string | null, adsAreFallback?: boolean, onRetryAds?: () => void }> = ({ ads, favorites, onToggleFavorite, adsError, adsAreFallback, onRetryAds }) => {
+  const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const sellerAds = useMemo(() => ads.filter(a => a.vlasnikId === userId), [ads, userId]);
   const sellerName = sellerAds.length > 0 ? sellerAds[0].kontaktIme : "Nepoznat prodavac";
   const linksDisabled = !!adsError || !!adsAreFallback;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const listKey = getListRouteKey(location.pathname, location.search);
+    const saved = loadAndClearScrollForList(listKey);
+    if (!saved || saved.y <= 0) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const doRestore = () => restoreScroll(saved.y);
+    requestAnimationFrame(() => requestAnimationFrame(doRestore));
+    const t1 = setTimeout(doRestore, 100);
+    const t2 = setTimeout(doRestore, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [location.pathname, location.search]);
+
   return (<div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-slide-up"><div className="flex items-center gap-4"><button onClick={() => navigate(-1)} className="p-2 bg-white/5 rounded-full text-white"><ChevronLeft className="w-6 h-6" /></button><div><h1 className="text-2xl font-black text-white uppercase tracking-widest">{sellerName}</h1><p className="text-[10px] text-[#9CA3AF] font-bold uppercase tracking-wider">{sellerAds.length} Aktivnih oglasa</p></div></div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{sellerAds.map(ad => (<AdCard key={ad.id} ad={ad} isFavorite={favorites.includes(ad.id)} onToggleFavorite={onToggleFavorite} linksDisabled={linksDisabled} onFallbackClick={onRetryAds} debugAdsError={adsError} debugAdsAreFallback={adsAreFallback} imgWidth={400} />))}</div></div>);
 };
 
@@ -3817,11 +3805,26 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
 };
 
 const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void }) => {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [myAds, setMyAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const showPendingBanner = searchParams.get('pending') === '1';
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Restore scroll pri povratku sa detail stranice
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const listKey = getListRouteKey(location.pathname, location.search);
+    const saved = loadAndClearScrollForList(listKey);
+    if (!saved || saved.y <= 0) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const doRestore = () => restoreScroll(saved.y);
+    requestAnimationFrame(() => requestAnimationFrame(doRestore));
+    const t1 = setTimeout(doRestore, 100);
+    const t2 = setTimeout(doRestore, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [location.pathname, location.search]);
 
   const fetchMyAds = () => {
     if (!user) return;
@@ -3914,8 +3917,23 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
 };
 
 const MyFavorites: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: (id: string) => void, adsError?: string | null, adsAreFallback?: boolean, onRetryAds?: () => void }> = ({ ads, favorites, onToggleFavorite, adsError, adsAreFallback, onRetryAds }) => {
+  const location = useLocation();
   const linksDisabled = !!adsError || !!adsAreFallback;
   const favoritedAds = ads.filter(a => favorites.includes(a.id));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const listKey = getListRouteKey(location.pathname, location.search);
+    const saved = loadAndClearScrollForList(listKey);
+    if (!saved || saved.y <= 0) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const doRestore = () => restoreScroll(saved.y);
+    requestAnimationFrame(() => requestAnimationFrame(doRestore));
+    const t1 = setTimeout(doRestore, 100);
+    const t2 = setTimeout(doRestore, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [location.pathname, location.search]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-widest">Sačuvano</h1>

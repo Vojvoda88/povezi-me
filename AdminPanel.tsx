@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
+import { getListRouteKey, saveScrollForList, loadAndClearScrollForList, restoreScroll } from './lib/scroll';
 import { mapApiAdToAd } from './features/ads/mappers';
 
 const API_BASE = getApiBase();
@@ -186,7 +187,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ))}
         </div>
       </div>
-      <main className="flex-1 p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0" data-scroll-root>{children}</main>
     </div>
   );
 };
@@ -365,8 +366,22 @@ export const AdminUsers: React.FC = () => {
 
 // ----- Ads -----
 export const AdminAds: React.FC = () => {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const listKey = getListRouteKey(location.pathname, location.search);
+    const saved = loadAndClearScrollForList(listKey);
+    if (!saved || saved.y <= 0) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const doRestore = () => restoreScroll(saved.y);
+    requestAnimationFrame(() => requestAnimationFrame(doRestore));
+    const t1 = setTimeout(doRestore, 100);
+    const t2 = setTimeout(doRestore, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [location.pathname, location.search]);
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const [searchInput, setSearchInput] = useState(search);
@@ -463,8 +478,22 @@ export const AdminAds: React.FC = () => {
 
 // ----- Odobri oglase (na čekanju) -----
 export const AdminPendingAds: React.FC = () => {
+  const location = useLocation();
   const q = new URLSearchParams({ page: '1', limit: '50', status: 'NA_CEKANJU' });
   const { data, loading, error, refetch } = useAdminFetch<{ ads: Array<{ id: string; naslov: string; slug: string; kategorija: string; cijena: number; vlasnik: { ime: string; email: string }; createdAt: string }>; total: number }>(`${API_BASE}/admin/ads?${q}`);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const listKey = getListRouteKey(location.pathname, location.search);
+    const saved = loadAndClearScrollForList(listKey);
+    if (!saved || saved.y <= 0) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const doRestore = () => restoreScroll(saved.y);
+    requestAnimationFrame(() => requestAnimationFrame(doRestore));
+    const t1 = setTimeout(doRestore, 100);
+    const t2 = setTimeout(doRestore, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [location.pathname, location.search]);
 
   const approve = (id: string) => {
     fetch(`${API_BASE}/admin/ads/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status: 'AKTIVAN' }) }).then(res => res.ok && refetch());
@@ -496,7 +525,7 @@ export const AdminPendingAds: React.FC = () => {
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button type="button" onClick={() => approve(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase flex-1" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Odobri</button>
                   <button type="button" onClick={() => reject(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij</button>
-                  <Link to={`/admin/oglas-preview/${a.slug}`} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border flex items-center justify-center" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
+                  <Link to={`/admin/oglas-preview/${a.slug}`} onClick={() => saveScrollForList(getListRouteKey('/admin/pending', ''))} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border flex items-center justify-center" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
                 </div>
               </div>
             ))}
@@ -523,7 +552,7 @@ export const AdminPendingAds: React.FC = () => {
                   <td className="p-3 flex gap-2">
                     <button type="button" onClick={() => approve(a.id)} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Odobri</button>
                     <button type="button" onClick={() => reject(a.id)} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij</button>
-                    <Link to={`/admin/oglas-preview/${a.slug}`} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
+                    <Link to={`/admin/oglas-preview/${a.slug}`} onClick={() => saveScrollForList(getListRouteKey('/admin/pending', ''))} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
                   </td>
                 </tr>
               ))}
