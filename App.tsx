@@ -41,6 +41,8 @@ import { mapApiAdToAd } from './features/ads/mappers';
 import { io, type Socket } from 'socket.io-client';
 const API_BASE = getApiBase();
 const TOKEN_KEY = 'povezi_access_token';
+/** Ključ za spremanje scroll pozicije liste oglasa (povratak sa detail stranice). */
+const ADS_LIST_SCROLL_KEY = 'adsListScrollY';
 
 /** Chat uključen – linkovi Poruke u headeru i "Poruka prodavcu" na stranici oglasa */
 const SHOW_CHAT = true;
@@ -789,54 +791,68 @@ const Marketplace: React.FC<{
   const searchQuery = searchParams.get('q') || "";
   const pendingScrollYRef = useRef<number | null>(null);
 
-  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa oglasa)
+  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = sessionStorage.getItem('marketplaceScroll');
+    const saved = sessionStorage.getItem(ADS_LIST_SCROLL_KEY) || sessionStorage.getItem('marketplaceScroll');
     if (!saved) return;
     const y = parseInt(saved, 10);
-    if (!Number.isNaN(y) && y > 0) pendingScrollYRef.current = y;
-    sessionStorage.removeItem('marketplaceScroll');
+    if (!Number.isNaN(y) && y >= 0) {
+      pendingScrollYRef.current = y;
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    }
   }, []);
 
-  // Vrati scroll tek kad je lista oglasa učitana (da stranica ima visinu)
+  // Vrati scroll nakon što se lista renderuje (requestAnimationFrame + fallback timeouti)
   useEffect(() => {
-    if (typeof window === 'undefined' || adsLoading || pendingScrollYRef.current == null) return;
+    if (typeof window === 'undefined' || pendingScrollYRef.current == null) return;
     let applied = false;
     const apply = () => {
       if (pendingScrollYRef.current == null || applied) return;
+      const savedY = pendingScrollYRef.current;
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (maxScroll <= 0) return; // Stranica još nema visinu
-      const y = Math.min(pendingScrollYRef.current, Math.max(0, maxScroll));
-      window.scrollTo({ top: y, behavior: 'instant' });
+      if (maxScroll <= 0) return;
+      const y = Math.min(savedY, Math.max(0, maxScroll));
+      window.scrollTo(0, y);
       applied = true;
       pendingScrollYRef.current = null;
+      sessionStorage.removeItem(ADS_LIST_SCROLL_KEY);
+      sessionStorage.removeItem('marketplaceScroll');
     };
-    apply();
+    const raf = requestAnimationFrame(() => {
+      apply();
+      setTimeout(apply, 0);
+    });
     const t1 = setTimeout(apply, 100);
     const t2 = setTimeout(apply, 300);
     const t3 = setTimeout(apply, 600);
     const t4 = setTimeout(apply, 1000);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [adsLoading, ads.length]);
 
-  // Spremi scroll poziciju na scroll event (da uvijek imamo najnoviju)
+  // Spremi scroll poziciju na scroll event (da uvijek imamo najnoviju za povratak)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleScroll = () => {
       const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-      if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
+      if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Pri unmountu: spremi scroll poziciju (backup kad korisnik ode na oglas)
+  // Pri unmountu: backup spremanje scroll pozicije
   useEffect(() => {
     if (typeof window === 'undefined') return;
     return () => {
       const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-      if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
+      if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
     };
   }, []);
 
@@ -1783,8 +1799,10 @@ const AdCardInner: React.FC<{
         rel="noopener"
         className={className}
         onClick={() => {
-          const y = typeof window !== 'undefined' ? (window.scrollY ?? window.pageYOffset ?? 0) : 0;
-          if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
+          if (typeof window !== 'undefined') {
+            const y = Math.round(window.scrollY ?? window.pageYOffset ?? 0);
+            sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
+          }
           if (import.meta.env?.DEV) {
             console.log('[AdCard]', 'link clicked', { id: ad.id, slug: ad.slug, to });
           }
@@ -1891,15 +1909,13 @@ const AdDetail: React.FC<{
     return () => { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } };
   }, [loadAd]);
 
-  // Scroll na vrh kada se otvori oglas (uvijek na vrh, bez obzira gdje si bio na marketplace)
+  // Detail stranica: uvijek kreni od vrha; isključi browser scroll restoration
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
-    scrollToTop();
-    const t1 = setTimeout(scrollToTop, 50);
-    const t2 = setTimeout(scrollToTop, 200);
-    const t3 = setTimeout(scrollToTop, 500);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    const raf = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
+    return () => cancelAnimationFrame(raf);
   }, [slug]);
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
