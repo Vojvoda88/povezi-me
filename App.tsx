@@ -790,6 +790,10 @@ const Marketplace: React.FC<{
   const [isNarrowScreen, setIsNarrowScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
   const searchQuery = searchParams.get('q') || "";
   const pendingScrollYRef = useRef<number | null>(null);
+  /** Scroll offset unutar VirtualList-a (samo kad je lista virtualizirana). */
+  const pendingListScrollRef = useRef<number | null>(null);
+  const virtualListRef = useRef<{ scrollTo: (offset: number) => void } | null>(null);
+  const virtualListScrollRef = useRef(0);
 
   // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice)
   useEffect(() => {
@@ -797,59 +801,94 @@ const Marketplace: React.FC<{
     try {
       const saved = sessionStorage.getItem(ADS_LIST_SCROLL_KEY) || sessionStorage.getItem('marketplaceScroll');
       if (!saved) return;
-      const y = parseInt(saved, 10);
-      if (!Number.isNaN(y) && y >= 0) {
-        pendingScrollYRef.current = y;
+      let windowY: number;
+      let listY: number | undefined;
+      if (saved.startsWith('{')) {
+        const parsed = JSON.parse(saved) as { w?: number; l?: number };
+        windowY = typeof parsed.w === 'number' && parsed.w >= 0 ? parsed.w : 0;
+        listY = typeof parsed.l === 'number' && parsed.l >= 0 ? parsed.l : undefined;
+      } else {
+        const y = parseInt(saved, 10);
+        windowY = !Number.isNaN(y) && y >= 0 ? y : 0;
+      }
+      pendingScrollYRef.current = windowY;
+      if (listY != null) pendingListScrollRef.current = listY;
+      if (windowY > 0 || (listY != null && listY > 0)) {
         if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       }
     } catch (_) { /* sessionStorage može biti onemogućen */ }
   }, []);
 
-  // Vrati scroll nakon što se lista renderuje (requestAnimationFrame + fallback timeouti)
+  // Vrati scroll nakon što se lista renderuje (window + eventualno VirtualList)
   useEffect(() => {
-    if (typeof window === 'undefined' || pendingScrollYRef.current == null) return;
-    let applied = false;
-    const apply = () => {
+    if (typeof window === 'undefined') return;
+    const hasPendingWindow = pendingScrollYRef.current != null;
+    const hasPendingList = pendingListScrollRef.current != null;
+    if (!hasPendingWindow && !hasPendingList) return;
+
+    let windowApplied = false;
+    const applyWindow = () => {
       try {
-        if (pendingScrollYRef.current == null || applied) return;
+        if (pendingScrollYRef.current == null || windowApplied) return;
         const savedY = pendingScrollYRef.current;
         const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        if (maxScroll <= 0) return;
-        const y = Math.min(savedY, Math.max(0, maxScroll));
-        window.scrollTo(0, y);
-        applied = true;
+        if (maxScroll > 0) {
+          const y = Math.min(savedY, Math.max(0, maxScroll));
+          window.scrollTo(0, y);
+        }
+        windowApplied = true;
         pendingScrollYRef.current = null;
-        try { sessionStorage.removeItem(ADS_LIST_SCROLL_KEY); sessionStorage.removeItem('marketplaceScroll'); } catch (_) {}
-      } catch (_) { /* zaštita od crasha pri restore scrolla */ }
+      } catch (_) {}
     };
-    const raf = requestAnimationFrame(() => {
-      apply();
-      setTimeout(apply, 0);
-    });
-    const t1 = setTimeout(apply, 100);
-    const t2 = setTimeout(apply, 300);
-    const t3 = setTimeout(apply, 600);
-    const t4 = setTimeout(apply, 1000);
+
+    const applyList = () => {
+      try {
+        if (pendingListScrollRef.current == null) return;
+        const list = virtualListRef.current;
+        if (!list || typeof list.scrollTo !== 'function') return;
+        const offset = Math.max(0, pendingListScrollRef.current);
+        list.scrollTo(offset);
+        pendingListScrollRef.current = null;
+      } catch (_) {}
+    };
+
+    const run = () => {
+      applyWindow();
+      applyList();
+      if (pendingScrollYRef.current == null && pendingListScrollRef.current == null) {
+        try { sessionStorage.removeItem(ADS_LIST_SCROLL_KEY); sessionStorage.removeItem('marketplaceScroll'); } catch (_) {}
+      }
+    };
+
+    const raf = requestAnimationFrame(() => { run(); setTimeout(run, 0); });
+    const t1 = setTimeout(run, 100);
+    const t2 = setTimeout(run, 300);
+    const t3 = setTimeout(run, 600);
+    const t4 = setTimeout(run, 1000);
+    const t5 = setTimeout(run, 1500);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      clearTimeout(t5);
     };
   }, [adsLoading, ads.length]);
 
-  // Spremi scroll poziciju na scroll event (da uvijek imamo najnoviju za povratak)
+  // Spremi scroll poziciju na scroll event (window + VirtualList ako korisnik skrola listu)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const handleScroll = () => {
+    const save = () => {
       try {
-        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-        if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+        const wy = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        const ly = virtualListScrollRef.current;
+        if (wy >= 0 || ly > 0)
+          sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
       } catch (_) {}
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', save, { passive: true });
+    return () => window.removeEventListener('scroll', save);
   }, []);
 
   // Pri unmountu: backup spremanje scroll pozicije
@@ -857,8 +896,10 @@ const Marketplace: React.FC<{
     if (typeof window === 'undefined') return;
     return () => {
       try {
-        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-        if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+        const wy = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        const ly = virtualListScrollRef.current;
+        if (wy >= 0 || ly >= 0)
+          sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: Math.round(wy), l: Math.round(ly) }));
       } catch (_) {}
     };
   }, []);
@@ -1059,6 +1100,14 @@ const Marketplace: React.FC<{
     setSearchParams(next);
     setFilters(DEFAULT_FILTERS);
   };
+
+  const saveScrollBeforeNavigate = useCallback(() => {
+    try {
+      const wy = Math.round(typeof window.scrollY === 'number' ? window.scrollY : (window as any).pageYOffset || 0);
+      const ly = Math.round(virtualListScrollRef.current);
+      sessionStorage.setItem(ADS_LIST_SCROLL_KEY, JSON.stringify({ w: wy, l: ly }));
+    } catch (_) {}
+  }, []);
 
   const searchParamsRef = useRef(searchParams);
   const filtersRef = useRef(filters);
@@ -1355,12 +1404,14 @@ const Marketplace: React.FC<{
               className="w-full"
             >
               <VirtualList
+                ref={virtualListRef}
                 height={virtualListSize.height}
                 width={virtualListSize.width}
                 itemCount={virtualRowCount}
                 itemSize={dynamicRowHeight}
                 overscanCount={VIRTUAL_OVERSCAN}
                 style={{ overflowX: 'hidden' }}
+                onScroll={({ scrollOffset }) => { virtualListScrollRef.current = scrollOffset; }}
               >
                 {({ index, style }) => {
                   const t0 = typeof performance !== 'undefined' && (import.meta as any).env?.DEV ? performance.now() : 0;
@@ -1406,6 +1457,7 @@ const Marketplace: React.FC<{
                               debugAdsAreFallback={adsAreFallback}
                               imgWidth={400}
                               fetchPriority={start + colIndex < 6 ? 'high' : 'low'}
+                              onBeforeNavigate={saveScrollBeforeNavigate}
                             />
                           </div>
                         );
@@ -1434,6 +1486,7 @@ const Marketplace: React.FC<{
                       debugAdsAreFallback={adsAreFallback}
                       imgWidth={400}
                       fetchPriority={i < 6 ? 'high' : 'low'}
+                      onBeforeNavigate={saveScrollBeforeNavigate}
                     />
                   </div>
                 );
@@ -1756,7 +1809,9 @@ const AdCardInner: React.FC<{
   imgWidth?: number;
   /** Prvih nekoliko karata: high za brži LCP. */
   fetchPriority?: 'high' | 'low';
-}> = ({ ad, isFavorite, onToggleFavorite, linksDisabled, onFallbackClick, debugAdsError, debugAdsAreFallback, imgWidth = 400, fetchPriority = 'low' }) => {
+  /** Poziva se prije navigacije na oglas (npr. da se spremi scroll pozicija liste). */
+  onBeforeNavigate?: () => void;
+}> = ({ ad, isFavorite, onToggleFavorite, linksDisabled, onFallbackClick, debugAdsError, debugAdsAreFallback, imgWidth = 400, fetchPriority = 'low', onBeforeNavigate }) => {
   const now = Date.now();
   const isPremium = ad.isPaid && ad.promotionStatus === "active" && ad.promotedUntil !== null && ad.promotedUntil > now;
   const hasSlug = !!ad.slug && typeof ad.slug === 'string';
@@ -1806,8 +1861,9 @@ const AdCardInner: React.FC<{
         rel="noopener"
         className={className}
         onClick={() => {
+          onBeforeNavigate?.();
           try {
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && !onBeforeNavigate) {
               const y = Math.round(window.scrollY ?? window.pageYOffset ?? 0);
               sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
             }
@@ -2022,6 +2078,19 @@ const AdDetail: React.FC<{
                 {hasImages && <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white border border-white/10 z-10 shadow-lg">{safeActiveIndex + 1} / {ad.slike.length}</div>}
              </div>
              {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getProxiedImageUrl(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
+            {/* Sve fotografije – pregled svih slika (važno za moderaciju i pregled cijelog sadržaja) */}
+            {hasImages && (
+              <div className="space-y-3 pt-2 border-t border-white/5">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Sve fotografije ({ad.slike.length})</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {ad.slike.map((img, i) => (
+                    <button key={i} type="button" onClick={() => setActiveImg(i)} className="aspect-square rounded-xl overflow-hidden border-2 border-white/10 hover:border-[#4F6DFF]/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]">
+                      <img src={getProxiedImageUrl(img)} alt={`${ad.naslov} – slika ${i + 1}`} className="w-full h-full object-cover" width={400} height={400} decoding="async" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
@@ -3024,7 +3093,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     if ((formData.whatsapp || '').trim()) contactDetails.whatsapp = (formData.whatsapp || '').trim();
     const details = Object.keys(contactDetails).length ? contactDetails : baseDetails;
 
-    const imageUrls: string[] = [];
+    const imagePayloads: { url: string; thumbUrl?: string; width?: number; height?: number }[] = [];
     if (images.length > 0) {
       setSubmitError('');
       setSubmitLoading(true);
@@ -3044,7 +3113,14 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
             setSubmitLoading(false);
             return;
           }
-          if (upData?.url) imageUrls.push(upData.url);
+          if (upData?.url) {
+            imagePayloads.push({
+              url: upData.url,
+              ...(upData.thumbUrl && { thumbUrl: upData.thumbUrl }),
+              ...(typeof upData.width === 'number' && { width: upData.width }),
+              ...(typeof upData.height === 'number' && { height: upData.height }),
+            });
+          }
         }
       } catch {
         setSubmitError('Greška u mreži pri uploadu slika.');
@@ -3065,7 +3141,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       potkategorija: isMotornaVozila && vehicleSubcategory ? vehicleSubcategory : undefined,
       tipOglasa,
       details: details || undefined,
-      images: imageUrls.map((url: string) => ({ url })),
+      images: imagePayloads.length > 0 ? imagePayloads : undefined,
     };
     if (isMotornaVozila && vehicleSubcategory && Object.keys(vDetails).length > 0) {
       const specs: Record<string, unknown> = {};
@@ -3455,11 +3531,11 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
     if (opis.length < 10) { setSubmitError('Opis mora imati najmanje 10 znakova.'); return; }
     if (cijena === undefined || cijena === null || Number.isNaN(cijena) || cijena < 0) { setSubmitError('Unesite ispravnu cijenu (0 ili više).'); return; }
 
-    const imageUrls: string[] = [];
+    const imagePayloads: { url: string; thumbUrl?: string; width?: number; height?: number }[] = [];
     for (let i = 0; i < images.length; i++) {
       const item = images[i];
       if (item.type === 'url') {
-        imageUrls.push(item.url);
+        imagePayloads.push({ url: item.url });
         continue;
       }
       try {
@@ -3469,7 +3545,14 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         const upRes = await fetch(`${API_BASE}/ads/upload`, { method: 'POST', headers: getAuthHeaders() as HeadersInit, body: fd });
         const upData = await upRes.json().catch(() => ({}));
         if (!upRes.ok) { setSubmitError(upData?.error || 'Greška pri uploadu slike.'); return; }
-        if (upData?.url) imageUrls.push(upData.url);
+        if (upData?.url) {
+          imagePayloads.push({
+            url: upData.url,
+            ...(upData.thumbUrl && { thumbUrl: upData.thumbUrl }),
+            ...(typeof upData.width === 'number' && { width: upData.width }),
+            ...(typeof upData.height === 'number' && { height: upData.height }),
+          });
+        }
       } catch {
         setSubmitError('Greška u mreži pri uploadu slika.'); return;
       }
@@ -3484,7 +3567,7 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         lokacija: formData.lokacija,
         tipOglasa: formData.tipOglasa === 'trazim' ? 'trazim' : 'prodajem',
         details: ad.kategorija === 'nekretnine' ? (formData.realEstateDetails && Object.keys(formData.realEstateDetails).length ? formData.realEstateDetails : undefined) : ad.kategorija === 'auto_dijelovi' ? formData.details : undefined,
-        images: imageUrls
+        images: imagePayloads,
       };
       const res = await fetch(`${API_BASE}/ads/my/${id}`, {
         method: 'PATCH',
