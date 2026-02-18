@@ -1869,11 +1869,28 @@ const AdCardInner: React.FC<{
     adCardDebugCount++;
   }
 
-  const previewSrc = useMemo(() => {
-    if (Array.isArray(ad.slikeThumbs) && ad.slikeThumbs.length > 0) return ad.slikeThumbs[0];
-    if (Array.isArray(ad.slike) && ad.slike.length > 0) return ad.slike[0];
-    return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect fill=\"%23182235\" width=\"400\" height=\"400\"/%3E%3Ctext fill=\"%239CA3AF\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\" dy=\".3em\" font-size=\"12\"%3ENema slike%3C/text%3E%3C/svg%3E';
+  const coverUrl = useMemo(() => {
+    const thumb = Array.isArray(ad.slikeThumbs) && ad.slikeThumbs[0];
+    const full = Array.isArray(ad.slike) && ad.slike[0];
+    const url = (typeof thumb === 'string' && thumb.trim()) ? thumb : (typeof full === 'string' && full.trim()) ? full : null;
+    return url;
   }, [ad.id, ad.slikeThumbs?.[0], ad.slike?.[0]]);
+
+  const [coverLoadState, setCoverLoadState] = useState<'proxy' | 'raw' | 'failed'>('proxy');
+  useEffect(() => setCoverLoadState('proxy'), [coverUrl]);
+
+  const LIST_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect fill=\"%23182235\" width=\"400\" height=\"400\"/%3E%3Ctext fill=\"%239CA3AF\" x=\"50%25\" y=\"50%25\" text-anchor=\"middle\" dy=\".3em\" font-size=\"12\"%3ENema slike%3C/text%3E%3C/svg%3E';
+  const coverSrc = !coverUrl
+    ? LIST_PLACEHOLDER
+    : coverLoadState === 'failed'
+      ? TRANSPARENT_1X1
+      : coverLoadState === 'raw'
+        ? (coverUrl.startsWith('http://') ? 'https://' + coverUrl.slice(7) : coverUrl)
+        : (imgWidth ? getProxiedImageUrl(coverUrl, imgWidth, imgWidth) : getProxiedImageUrl(coverUrl));
+  const handleCoverError = () => {
+    if (coverLoadState === 'proxy') setCoverLoadState('raw');
+    else if (coverLoadState === 'raw') setCoverLoadState('failed');
+  };
 
   const LinkOrSpan = ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => {
     const useSpan = effectiveLinksDisabled || to === '#';
@@ -1927,7 +1944,8 @@ const AdCardInner: React.FC<{
     >
       <LinkOrSpan to={linkTo} className="aspect-square overflow-hidden relative block">
         <img
-          src={imgWidth ? getProxiedImageUrl(previewSrc, imgWidth, imgWidth) : getProxiedImageUrl(previewSrc)}
+          src={coverSrc}
+          onError={handleCoverError}
           alt={ad.naslov}
           width={400}
           height={400}
