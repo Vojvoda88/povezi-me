@@ -755,44 +755,31 @@ const Marketplace: React.FC<{
   const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
 
-  const prevLocationRef = useRef<string>('');
-
-  // Vrati scroll poziciju kada se vraćaš na marketplace
+  // Pri mountu: vrati scroll ako smo se vratili sa oglasa (sessionStorage ima spremljenu poziciju)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const isMarketplace = location.pathname === '/marketplace' || location.pathname.startsWith('/kategorija/');
-    const wasMarketplace = prevLocationRef.current === '/marketplace' || prevLocationRef.current.startsWith('/kategorija/');
-    const comingFromAd = prevLocationRef.current.startsWith('/oglas/');
-    
-    if (isMarketplace && comingFromAd && !wasMarketplace) {
-      // Vraćaš se sa oglasa na marketplace - vrati scroll poziciju
-      const saved = sessionStorage.getItem('marketplaceScroll');
-      if (saved) {
-        const y = parseInt(saved, 10);
-        if (!Number.isNaN(y) && y > 0) {
-          // Mali delay da se DOM učita
-          setTimeout(() => window.scrollTo({ top: y, behavior: 'instant' }), 50);
-        }
-      }
-    }
-    
-    prevLocationRef.current = location.pathname;
-  }, [location.pathname]);
+    const saved = sessionStorage.getItem('marketplaceScroll');
+    if (!saved) return;
+    const y = parseInt(saved, 10);
+    if (Number.isNaN(y) || y <= 0) return;
+    sessionStorage.removeItem('marketplaceScroll');
+    // Više pokušaja jer se lista oglasa može kasnije iscrtati
+    const restore = () => window.scrollTo({ top: y, behavior: 'instant' });
+    restore();
+    const t1 = setTimeout(restore, 80);
+    const t2 = setTimeout(restore, 200);
+    const t3 = setTimeout(restore, 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, []);
 
-  // Sačuvaj scroll poziciju kada napuštaš marketplace
+  // Pri unmountu: spremi scroll poziciju (kad korisnik ode na oglas)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const isMarketplace = location.pathname === '/marketplace' || location.pathname.startsWith('/kategorija/');
-    
     return () => {
-      if (isMarketplace) {
-        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-        if (y > 0) {
-          sessionStorage.setItem('marketplaceScroll', String(y));
-        }
-      }
+      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+      if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
     };
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
     const m = window.matchMedia('(max-width: 1023px)');
@@ -1778,6 +1765,8 @@ const AdCardInner: React.FC<{
         to={to}
         className={className}
         onClick={() => {
+          const y = typeof window !== 'undefined' ? (window.scrollY ?? window.pageYOffset ?? 0) : 0;
+          if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
           if (import.meta.env?.DEV) {
             console.log('[AdCard]', 'link clicked', { id: ad.id, slug: ad.slug, to });
           }
