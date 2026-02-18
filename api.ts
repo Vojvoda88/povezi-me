@@ -93,15 +93,21 @@ export function isChatDebug(): boolean {
  * width/height (pikseli): dodaje &w= i &h= za resize na proxyju – brže učitavanje u listi.
  * Inače vraća isti URL. Za prazan/undefined vraća ''.
  */
+/** 1x1 transparent GIF – koristi se kad slika potpuno ne učitava (ne ruši layout, nema broken ikone). */
+export const TRANSPARENT_1X1 =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 export function getProxiedImageUrl(
   url: string | undefined | null,
   width?: number,
   height?: number
 ): string {
   if (url == null || url === '') return '';
-  if (!url.includes('supabase.co/storage')) return url;
+  const safe = String(url).trim();
+  const httpsUrl = safe.startsWith('http://') ? 'https://' + safe.slice(7) : safe;
+  if (!httpsUrl.includes('supabase.co/storage')) return httpsUrl;
   const base = getApiBase();
-  let out = `${base}/img?url=${encodeURIComponent(url)}`;
+  let out = `${base}/img?url=${encodeURIComponent(httpsUrl)}`;
   if (width != null && width > 0) out += `&w=${Math.min(width, 1200)}`;
   if (height != null && height > 0) out += `&h=${Math.min(height, 1200)}`;
   return out;

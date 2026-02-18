@@ -32,7 +32,7 @@ import { FormField } from './components/FormField';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
 const AdminRoutes = React.lazy(() => import('./AdminPanel').then((m) => ({ default: m.AdminRoutes })));
-import { getApiBase, getApiBaseForRedirect, getSocketUrl, getProxiedImageUrl, isChatDebug } from './api';
+import { getApiBase, getApiBaseForRedirect, getSocketUrl, getProxiedImageUrl, TRANSPARENT_1X1, isChatDebug } from './api';
 import { apiFetch } from './lib/api/client';
 import { useAds } from './hooks/useAds';
 import { useFavorites } from './hooks/useFavorites';
@@ -1972,6 +1972,8 @@ const AdDetail: React.FC<{
   const location = useLocation();
   const [adFromApi, setAdFromApi] = useState<Ad | null | undefined>(undefined);
   const [activeImg, setActiveImg] = useState(0);
+  const [proxyFailedUrls, setProxyFailedUrls] = useState<Set<string>>(new Set());
+  const [fullyFailedUrls, setFullyFailedUrls] = useState<Set<string>>(new Set());
 
   const [fetchError, setFetchError] = useState<boolean>(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -2037,7 +2039,18 @@ const AdDetail: React.FC<{
     } catch (_) { /* zaštita od crasha */ }
   }, [slug]);
 
+  useEffect(() => { setProxyFailedUrls(new Set()); setFullyFailedUrls(new Set()); }, [slug]);
+
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
+  const getImageSrc = (url: string): string => {
+    if (fullyFailedUrls.has(url)) return TRANSPARENT_1X1;
+    if (proxyFailedUrls.has(url)) return url.startsWith('http://') ? 'https://' + url.slice(7) : url;
+    return getProxiedImageUrl(url);
+  };
+  const handleImageError = (rawUrl: string) => {
+    if (proxyFailedUrls.has(rawUrl)) setFullyFailedUrls(prev => new Set(prev).add(rawUrl));
+    else setProxyFailedUrls(prev => new Set(prev).add(rawUrl));
+  };
   const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
   const metrics = useMemo(() => ad ? getSellerMetrics(safeVlasnikId || '') : { avg: "5.0", count: 0 }, [ad, safeVlasnikId, ratings]);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
@@ -2123,7 +2136,7 @@ const AdDetail: React.FC<{
         <div className="lg:col-span-8 space-y-8">
           <div className="space-y-4">
              <div className="aspect-[4/3] sm:aspect-video bg-[#0B1220] rounded-xl overflow-hidden border border-white/5 relative group shadow-2xl">
-                {hasImages && heroImage ? <img src={getProxiedImageUrl(heroImage)} className="w-full h-full object-contain" alt={ad.naslov} width={800} height={600} decoding="async" fetchPriority="high" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-[#9CA3AF] text-sm uppercase">Nema slike</div>}
+                {hasImages && heroImage ? <img src={getImageSrc(heroImage)} onError={() => handleImageError(heroImage)} className="w-full h-full object-contain" alt={ad.naslov} width={800} height={600} decoding="async" fetchPriority="high" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-[#9CA3AF] text-sm uppercase">Nema slike</div>}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                 {hasImages && <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white border border-white/10 z-10 shadow-lg">{safeActiveIndex + 1} / {ad.slike.length}</div>}
                 {hasImages && ad.slike.length > 1 && (
@@ -2137,7 +2150,7 @@ const AdDetail: React.FC<{
                   </>
                 )}
              </div>
-             {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getProxiedImageUrl(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
+             {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getImageSrc(img)} onError={() => handleImageError(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
@@ -3950,13 +3963,19 @@ const LegalPage: React.FC<{ title: string; content: React.ReactNode }> = ({ titl
 );
 
 const Footer = () => (
-  <footer className="py-12 px-6 pb-32 lg:pb-12 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
-    <Logo variant="vertical" />
-    <nav className="flex flex-wrap justify-center gap-4 mt-4">
-      <Link to="/pravila" className="text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>
-      <Link to="/privatnost" className="text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Politika privatnosti</Link>
+  <footer className="flex-shrink-0 pt-3 pb-14 px-3 lg:py-6 lg:px-4 lg:pb-6 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
+    <div className="flex flex-col items-center gap-1 lg:gap-2">
+      <LogoSymbol type={1} className="w-8 h-8 lg:w-12 lg:h-12" />
+      <div className="text-center">
+        <div className="text-base lg:text-2xl font-bold tracking-tighter" style={{ color: 'var(--text-primary)' }}>Poveži.ME</div>
+        <div className="text-[8px] lg:text-[9px] font-black uppercase tracking-[0.2em] lg:tracking-[0.25em] mt-0.5" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</div>
+      </div>
+    </div>
+    <nav className="flex flex-wrap justify-center gap-2 lg:gap-3 mt-2 lg:mt-3">
+      <Link to="/pravila" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>
+      <Link to="/privatnost" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Politika privatnosti</Link>
     </nav>
-    <p className="text-[10px] mt-6 uppercase tracking-[0.2em] font-bold opacity-60" style={{ color: 'var(--text-secondary)' }}>© 2024 Poveži.ME Premium Marketplace</p>
+    <p className="text-[8px] lg:text-[9px] mt-2 lg:mt-4 uppercase tracking-[0.1em] lg:tracking-[0.15em] font-bold opacity-60" style={{ color: 'var(--text-secondary)' }}>© 2024 Poveži.ME Premium Marketplace</p>
   </footer>
 );
 

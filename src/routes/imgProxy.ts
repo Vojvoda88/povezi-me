@@ -43,18 +43,16 @@ router.get('/img', imgProxyLimiter as any, async (req: Request, res: Response): 
     return;
   }
 
-  if (!decoded || !decoded.startsWith(allowedOrigin)) {
-    res.status(400).json({ error: 'Neispravan URL.' });
-    return;
-  }
-
-  if (!decoded.includes('/storage/')) {
+  const imageUrl = (decoded || '').trim().startsWith('http://')
+    ? 'https://' + (decoded || '').trim().slice(7)
+    : (decoded || '').trim();
+  if (!imageUrl || !imageUrl.startsWith(allowedOrigin) || !imageUrl.includes('/storage/')) {
     res.status(400).json({ error: 'Neispravan URL.' });
     return;
   }
 
   try {
-    const resp = await fetch(decoded, {
+    const resp = await fetch(imageUrl, {
       method: 'GET',
       headers: { Accept: 'image/*' },
       signal: AbortSignal.timeout(10000),
