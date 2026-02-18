@@ -101,6 +101,9 @@ export const useAds = (): UseAdsController => {
           setAds(prev => (prev.length === 0 ? INITIAL_ADS : prev));
           setAdsAreFallback(true);
           setAdsError('Oglasi se trenutno ne mogu učitati. Prikazujemo primjer oglasa.');
+          // Jedan retry nakon 2s (pomaže kad se Render Free tier "budi")
+          lastAdsQueryRef.current = null;
+          setTimeout(() => runFetch(1, false, query), 2000);
         }
       } finally {
         if (abortRef.current === controller) {

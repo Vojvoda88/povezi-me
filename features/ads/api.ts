@@ -11,7 +11,8 @@ export const fetchAdsApi = async (query: AdsQuery, signal?: AbortSignal): Promis
   const queryString = new URLSearchParams(q).toString();
   const url = `${API_BASE}/ads?${queryString}`;
 
-  const data = await apiFetch<any>(url, { signal });
+  // Veći timeout da Render (Free tier) stigne da se "probudi" na prvom zahtjevu
+  const data = await apiFetch<any>(url, { signal, timeoutMs: 22000 });
 
   const list = Array.isArray(data) ? data : (data?.ads ?? []);
   const total = typeof data?.total === 'number' ? data.total : list.length;
