@@ -562,6 +562,7 @@ const AppContent: React.FC = () => {
         <AdminRoutes
           user={currentUser}
           onLogin={(u) => setCurrentUser(mapApiUserToUser(u))}
+          AdDetailViewComponent={AdDetailView}
           onToggleFavorite={toggleFavorite}
           favorites={favorites}
           ratings={ratings}
@@ -2112,6 +2113,28 @@ export const AdDetailView: React.FC<{
   const heroImage = hasImages ? ad.slike[safeActiveIndex] : undefined;
   const isOwner = user && ad.vlasnikId === user.id;
 
+  const reportModal = reportOpen
+    ? createPortal(
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70" onClick={() => !reportLoading && setReportOpen(false)}>
+          <div className="rounded-2xl border p-6 w-full max-w-md shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Prijavi oglas</h3>
+            {reportSuccess ? <p className="text-sm mb-4" style={{ color: 'var(--accent)' }}>Prijava je zabilježena. Hvala.</p> : (
+              <>
+                {reportError && <p className="text-red-400 text-sm mb-2">{reportError}</p>}
+                <input type="text" value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Razlog prijave *" className="w-full h-12 rounded-xl px-4 border mb-3 outline-none text-sm" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
+                <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)} placeholder="Dodatne informacije (opciono)" rows={3} className="w-full rounded-xl px-4 py-3 border mb-4 outline-none text-sm resize-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setReportOpen(false)} disabled={reportLoading} className="flex-1 h-12 rounded-xl border font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
+                  <button type="button" onClick={handleReportSubmit} disabled={reportLoading} className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] text-white" style={{ backgroundColor: 'var(--accent)' }}>{reportLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Pošalji'}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 animate-slide-up">
       {isAdminPreview && adminActions && (
@@ -2299,41 +2322,29 @@ export const AdDetailView: React.FC<{
             </div>
             )}
           </div>
-        </div>
-      </div>
-      {similarLoading && <div className="mt-12 max-w-6xl mx-auto px-4"><div className="h-8 w-48 rounded-lg bg-[#131C2B] animate-pulse mb-4" /><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">{[1,2,3,4].map(i => <div key={i} className="rounded-[18px] overflow-hidden aspect-square bg-[#131C2B] animate-pulse" />)}</div></div>}
-      {!similarLoading && similarAds.length > 0 && (
-        <div className="mt-12 max-w-6xl mx-auto px-4">
-          <h2 className="text-lg font-black uppercase tracking-wide mb-4" style={{ color: 'var(--text-primary)' }}>Slični oglasi</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
-            {similarAds.map((similar) => (
-              <AdCard key={similar.id} ad={similar} isFavorite={favorites.includes(similar.id)} onToggleFavorite={onToggleFavorite} imgWidth={400} />
-            ))}
-          </div>
-        </div>
-      )}
-      {reportOpen && createPortal(
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70" onClick={() => !reportLoading && setReportOpen(false)}>
-          <div className="rounded-2xl border p-6 w-full max-w-md shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Prijavi oglas</h3>
-            {reportSuccess ? <p className="text-sm mb-4" style={{ color: 'var(--accent)' }}>Prijava je zabilježena. Hvala.</p> : (
-              <>
-                {reportError && <p className="text-red-400 text-sm mb-2">{reportError}</p>}
-                <input type="text" value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Razlog prijave *" className="w-full h-12 rounded-xl px-4 border mb-3 outline-none text-sm" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-                <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)} placeholder="Dodatne informacije (opciono)" rows={3} className="w-full rounded-xl px-4 py-3 border mb-4 outline-none text-sm resize-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setReportOpen(false)} disabled={reportLoading} className="flex-1 h-12 rounded-xl border font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
-                  <button type="button" onClick={handleReportSubmit} disabled={reportLoading} className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] text-white" style={{ backgroundColor: 'var(--accent)' }}>{reportLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Pošalji'}</button>
+        {(similarLoading || similarAds.length > 0) && (
+          <div className="lg:col-span-12 mt-12">
+            {similarLoading ? (
+              <div className="max-w-6xl mx-auto px-4">
+                <div className="h-8 w-48 rounded-lg bg-[#131C2B] animate-pulse mb-4" />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="rounded-[18px] overflow-hidden aspect-square bg-[#131C2B] animate-pulse" />)}
                 </div>
-              </>
+              </div>
+            ) : (
+              <div className="max-w-6xl mx-auto px-4">
+                <h2 className="text-lg font-black uppercase tracking-wide mb-4" style={{ color: 'var(--text-primary)' }}>Slični oglasi</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
+                  {similarAds.map((similar) => (
+                    <AdCard key={similar.id} ad={similar} isFavorite={favorites.includes(similar.id)} onToggleFavorite={onToggleFavorite} imgWidth={400} />
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-        </div>,
-        document.body
-      )}
-           </div>
-        </div>
+        )}
       </div>
+      {reportModal}
     </div>
   );
 };
@@ -2493,40 +2504,6 @@ const AdDetail: React.FC<{
         },
       } : undefined}
     />
-  );
-};
-
-const SpecGrid = ({ details }: { details: any }) => {
-  if (!details || typeof details !== 'object') return null;
-  const specs = [];
-  if (details.marka) specs.push({ label: 'Marka', value: details.marka });
-  if (details.model) specs.push({ label: 'Model', value: details.model });
-  if (details.godiste) specs.push({ label: 'Godište', value: `${details.godiste}. god` });
-  if (details.kilometraza != null) specs.push({ label: 'Kilometraža', value: `${(Number(details.kilometraza) || 0).toLocaleString()} km` });
-  if (details.gorivo) specs.push({ label: 'Gorivo', value: details.gorivo });
-  if (details.mjenjac) specs.push({ label: 'Mjenjač', value: details.mjenjac });
-  if (details.snaga) specs.push({ label: 'Snaga', value: `${details.snaga} KS` });
-  if (details.snagaKW) specs.push({ label: 'Snaga', value: `${details.snagaKW} kW` });
-  if (details.snagaKS != null && !details.snaga) specs.push({ label: 'Snaga', value: `${details.snagaKS} KS` });
-  if (details.kubikaza) specs.push({ label: 'Kubikaža', value: `${details.kubikaza} cm3` });
-  if (details.karoserija) specs.push({ label: 'Karoserija', value: details.karoserija });
-  if (details.pogon) specs.push({ label: 'Pogon', value: details.pogon });
-  if (details.stanje) specs.push({ label: 'Stanje', value: details.stanje });
-  if (details.tip) specs.push({ label: 'Tip', value: details.tip });
-  return (<>{specs.map((s, i) => (<div key={i} className="bg-[#131C2B] border border-white/5 p-4 rounded-2xl flex flex-col gap-1 hover:border-[#4F6DFF]/30 group transition-all"><span className="text-[8px] font-black uppercase text-[#9CA3AF] tracking-widest group-hover:text-[#4F6DFF]">{s.label}</span><span className="text-xs font-bold text-[#F3F4F6] truncate">{s.value}</span></div>))}</>);
-};
-
-const RatingSection = ({ sellerId, user, onAddRating, metrics }: { sellerId: string, user: User | null, onAddRating: (sid: string, s: number) => void, metrics: { avg: string, count: number } }) => {
-  const [hoverRating, setHoverRating] = useState(0);
-  const isSelf = user?.id === sellerId;
-  return (
-    <div className="space-y-4 pt-8 border-t border-white/5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div><h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] mb-1">⭐ Ocijeni prodavca</h3></div>
-        {!isSelf && user && (<div className="flex items-center gap-1.5 bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{[1, 2, 3, 4, 5].map((s) => (<button key={s} onMouseEnter={() => setHoverRating(s)} onMouseLeave={() => setHoverRating(0)} onClick={() => onAddRating(sellerId, s)} className="transition-all active:scale-125 p-1"><Star className={`w-6 h-6 ${s <= (hoverRating || 0) ? 'fill-amber-400 text-amber-400' : 'text-white/20'}`} /></button>))}</div>)}
-      </div>
-      <div className="flex items-center gap-4 bg-white/5 p-6 rounded-xl border border-white/5"><div className="text-4xl font-black text-white">{metrics.avg}</div><div><div className="flex text-amber-400 gap-0.5 mb-1">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-10'}`} />)}</div><div className="text-[9px] text-[#9CA3AF] font-black uppercase tracking-widest">Bazirano na {metrics.count} recenzija</div></div></div>
-    </div>
   );
 };
 

@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
-import { AdDetailView } from './App';
 import { mapApiAdToAd } from './features/ads/mappers';
 
 const API_BASE = getApiBase();
@@ -539,6 +538,7 @@ export const AdminPendingAds: React.FC = () => {
 
 // ----- Pregled oglasa (admin) – ISTI layout kao public AdDetail, admin bar iznad -----
 type AdminAdPreviewProps = {
+  AdDetailViewComponent: React.ComponentType<any>;
   user: User | null;
   onToggleFavorite: (id: string) => void;
   favorites: string[];
@@ -548,7 +548,7 @@ type AdminAdPreviewProps = {
   setPageMeta: (title: string, desc?: string, img?: string, url?: string) => void;
 };
 
-const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics, setPageMeta }) => {
+const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics, setPageMeta }) => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -587,6 +587,7 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ user, onToggleFavorite,
     );
   }
 
+  const AdDetailView = AdDetailViewComponent;
   return (
     <AdDetailView
       ad={ad}
@@ -749,6 +750,7 @@ function useDebounce<T>(value: T, ms: number): T {
 type AdminRoutesProps = {
   user: User | null;
   onLogin: (u: User) => void;
+  AdDetailViewComponent: React.ComponentType<any>;
   onToggleFavorite?: (id: string) => void;
   favorites?: string[];
   ratings?: Array<{ adId?: string; sellerId?: string; userId?: string; buyerId?: string; score: number }>;
@@ -757,7 +759,7 @@ type AdminRoutesProps = {
   setPageMeta?: (title: string, desc?: string, img?: string, url?: string) => void;
 };
 
-export const AdminRoutes: React.FC<AdminRoutesProps> = ({ user, onLogin, onToggleFavorite = () => {}, favorites = [], ratings = [], onAddRating = () => {}, getSellerMetrics = () => ({ avg: '0', count: 0 }), setPageMeta = () => {} }) => (
+export const AdminRoutes: React.FC<AdminRoutesProps> = ({ user, onLogin, AdDetailViewComponent, onToggleFavorite = () => {}, favorites = [], ratings = [], onAddRating = () => {}, getSellerMetrics = () => ({ avg: '0', count: 0 }), setPageMeta = () => {} }) => (
   <Routes>
     <Route path="/admin/login" element={user?.role === 'admin' ? <Navigate to="/admin" replace /> : <AdminLogin onLogin={onLogin} />} />
     <Route path="/admin" element={<AdminGuard user={user}><AdminLayout><AdminDashboard /></AdminLayout></AdminGuard>} />
@@ -765,7 +767,7 @@ export const AdminRoutes: React.FC<AdminRoutesProps> = ({ user, onLogin, onToggl
     <Route path="/admin/users/:id" element={<AdminGuard user={user}><AdminLayout><AdminUserDetail /></AdminLayout></AdminGuard>} />
     <Route path="/admin/ads" element={<AdminGuard user={user}><AdminLayout><AdminAds /></AdminLayout></AdminGuard>} />
     <Route path="/admin/pending" element={<AdminGuard user={user}><AdminLayout><AdminPendingAds /></AdminLayout></AdminGuard>} />
-    <Route path="/admin/oglas-preview/:slug" element={<AdminGuard user={user}><AdminLayout><AdminAdPreview user={user} onToggleFavorite={onToggleFavorite} favorites={favorites} ratings={ratings} onAddRating={onAddRating} getSellerMetrics={getSellerMetrics} setPageMeta={setPageMeta} /></AdminLayout></AdminGuard>} />
+    <Route path="/admin/oglas-preview/:slug" element={<AdminGuard user={user}><AdminLayout><AdminAdPreview AdDetailViewComponent={AdDetailViewComponent} user={user} onToggleFavorite={onToggleFavorite} favorites={favorites} ratings={ratings} onAddRating={onAddRating} getSellerMetrics={getSellerMetrics} setPageMeta={setPageMeta} /></AdminLayout></AdminGuard>} />
     <Route path="/admin/reports" element={<AdminGuard user={user}><AdminLayout><AdminReports /></AdminLayout></AdminGuard>} />
     <Route path="/admin/payments" element={<AdminGuard user={user}><AdminLayout><AdminPayments /></AdminLayout></AdminGuard>} />
   </Routes>
