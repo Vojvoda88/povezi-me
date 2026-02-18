@@ -8,7 +8,7 @@ import {
   LogOut, Send, ArrowLeft, Bell, AlertTriangle, Zap, XCircle, Loader2, Rocket, Heart,
   ChevronRight as ChevronRightIcon, StarHalf, MessageCircle, SlidersHorizontal, Camera,
   Instagram, Facebook, Trash, Settings2, Info, Calendar, UserCheck, ChevronRight, Share2, Award, SearchX,
-  Plus, ChevronDown, Check, Upload, Sun, Moon, Bookmark
+  Plus, ChevronDown, Check, Upload, Sun, Moon
 } from 'lucide-react';
 
 import {
@@ -406,7 +406,6 @@ const AppContent: React.FC = () => {
       '/registracija': 'Registracija - Poveži.ME',
       '/moji-oglasi': 'Moji oglasi - Poveži.ME',
       '/moji-favoriti': 'Sačuvano - Poveži.ME',
-      '/moje-spremljene-pretrage': 'Spremljene pretrage - Poveži.ME',
       '/objavi': 'Objavi oglas - Poveži.ME',
       '/poruke': 'Poruke - Poveži.ME',
       '/obavjestenja': 'Obavještenja - Poveži.ME',
@@ -562,7 +561,7 @@ const AppContent: React.FC = () => {
             <Route path="/moji-oglasi" element={<RequireAuth><MyAds user={currentUser} onRefresh={refreshAds} /></RequireAuth>} />
             <Route path="/moji-oglasi/uredi/:id" element={<RequireAuth><EditAd user={currentUser} onSaved={refreshAds} /></RequireAuth>} />
             <Route path="/moji-favoriti" element={<RequireAuth><MyFavorites ads={ads} favorites={favorites} onToggleFavorite={toggleFavorite} adsError={adsError} adsAreFallback={adsAreFallback} onRetryAds={refreshAds} /></RequireAuth>} />
-            <Route path="/moje-spremljene-pretrage" element={<RequireAuth><MySavedSearches /></RequireAuth>} />
+            <Route path="/moje-spremljene-pretrage" element={<Navigate to="/marketplace" replace />} />
             <Route path="/objavi" element={<RequireAuth><AddAd user={currentUser} onAddAd={prependAd} onPublishSuccess={refreshAds} /></RequireAuth>} />
             <Route path="/poruke" element={SHOW_CHAT ? <RequireAuth><Chat user={currentUser} ads={ads} conversations={conversations} setConversations={setConversations} messages={messages} setMessages={setMessages} setNotifications={setNotifications} onRefreshNotifications={fetchNotifications} onMarkMessageNotificationsRead={markMessageNotificationsReadForConversation} /></RequireAuth> : <Navigate to="/marketplace" replace />} />
             <Route path="/pravila" element={<LegalPage title="Pravila korištenja" content={PRAVILA_CONTENT} />} />
@@ -671,7 +670,7 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
           )}
           {SHOW_CHAT && user && <Link to="/poruke" className="p-2 rounded-xl hidden lg:block transition-colors hover:opacity-80" style={{ color: 'var(--text-secondary)' }} title="Poruke"><MessageCircle className="w-5 h-5" /></Link>}
           {user && (
-            <Link to="/obavjestenja" className="p-2 relative rounded-xl hidden lg:block transition-colors hover:opacity-80" style={{ color: 'var(--text-secondary)' }} title="Obavještenja"><Bell className="w-5 h-5" />{unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}</Link>
+            <Link to="/obavjestenja" className="p-2 relative rounded-xl transition-colors hover:opacity-80 flex items-center justify-center" style={{ color: 'var(--text-secondary)' }} title="Obavještenja"><Bell className="w-5 h-5" />{unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}</Link>
           )}
           {!user && (
             <Link to="/prijava" className="hidden sm:flex h-10 lg:h-11 px-4 text-white rounded-xl items-center justify-center font-bold text-[10px] lg:text-xs uppercase transition-colors" style={{ backgroundColor: 'var(--accent)' }}>Prijavi se</Link>
@@ -698,7 +697,7 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
                   <MenuLink to="/objavi" icon={<PlusCircle className="w-4 h-4" />} label="Objavi oglas" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-oglasi" icon={<LayoutDashboard className="w-4 h-4" />} label="Moji Oglasi" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-favoriti" icon={<Heart className="w-4 h-4" />} label="Sačuvano" onClick={() => setMenuOpen(false)} />
-                  <MenuLink to="/moje-spremljene-pretrage" icon={<Bookmark className="w-4 h-4" />} label="Spremljene pretrage" onClick={() => setMenuOpen(false)} />
+                  <MenuLink to="/obavjestenja" icon={<Bell className="w-4 h-4" />} label="Obavještenja" onClick={() => setMenuOpen(false)} />
                   {SHOW_CHAT && <MenuLink to="/poruke" icon={<MessageSquare className="w-4 h-4" />} label="Poruke" onClick={() => setMenuOpen(false)} />}
                   <div className="h-px bg-slate-700 my-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
                   <button
@@ -787,10 +786,6 @@ const Marketplace: React.FC<{
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showFiltersOpen, setShowFiltersOpen] = useState(false);
   const [isNarrowScreen, setIsNarrowScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
-  const [showSaveSearchModal, setShowSaveSearchModal] = useState(false);
-  const [saveSearchNaziv, setSaveSearchNaziv] = useState('');
-  const [saveSearchLoading, setSaveSearchLoading] = useState(false);
-  const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
   const pendingScrollYRef = useRef<number | null>(null);
 
@@ -1187,50 +1182,7 @@ const Marketplace: React.FC<{
               <ChevronDown className={`w-4 h-4 transition-transform ${showFiltersOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-secondary)' }} />
             </button>
           </div>
-          {user && (
-            <button
-              type="button"
-              onClick={() => { setSaveSearchError(''); setSaveSearchNaziv(''); setShowSaveSearchModal(true); }}
-              className="flex items-center gap-2 h-12 px-4 rounded-xl font-bold uppercase text-[10px] tracking-wide border transition-colors"
-              style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-            >
-              <Bookmark className="w-4 h-4" /> Spremi pretragu
-            </button>
-          )}
         </div>
-        {showSaveSearchModal && user && createPortal(
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70" onClick={() => !saveSearchLoading && setShowSaveSearchModal(false)}>
-            <div className="rounded-2xl border p-6 w-full max-w-md shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Spremi pretragu</h3>
-              <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>Naziv (opciono)</p>
-              <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. VW Golf do 5000€" className="w-full h-12 rounded-xl px-4 border mb-3 outline-none text-sm" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-              {saveSearchError && <p className="text-red-400 text-sm mb-2">{saveSearchError}</p>}
-              <div className="flex gap-3">
-                <button type="button" onClick={() => !saveSearchLoading && setShowSaveSearchModal(false)} disabled={saveSearchLoading} className="flex-1 h-12 rounded-xl border font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
-                <button type="button" disabled={saveSearchLoading} onClick={() => {
-                  setSaveSearchError('');
-                  setSaveSearchLoading(true);
-                  const query: Record<string, string> = {};
-                  if (activeCategory?.id) query.kategorija = activeCategory.id;
-                  ['subcategory', 'q', 'lokacija', 'make', 'model', 'priceMin', 'priceMax', 'yearMin', 'yearMax', 'gorivo', 'mjenjac', 'stanje', 'sort'].forEach(k => {
-                    const v = searchParams.get(k);
-                    if (v) query[k] = v;
-                  });
-                  fetch(`${API_BASE}/saved-searches`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                    body: JSON.stringify({ naziv: saveSearchNaziv.trim() || null, query }),
-                  }).then(res => res.json().then((data: { error?: string }) => ({ ok: res.ok, data }))).then(({ ok, data }) => {
-                    setSaveSearchLoading(false);
-                    if (ok) { setShowSaveSearchModal(false); setSaveSearchNaziv(''); }
-                    else setSaveSearchError(data?.error || 'Greška pri spremanju.');
-                  }).catch(() => { setSaveSearchLoading(false); setSaveSearchError('Greška u mreži.'); });
-                }} className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] text-white" style={{ backgroundColor: 'var(--accent)' }}>{saveSearchLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spremi'}</button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
         <div className={`rounded-xl border overflow-hidden transition-all overflow-y-auto ${showFiltersOpen ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0'} lg:max-h-none lg:opacity-100`} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           {(isVehicleCategory && filterPanelCategory && (VEHICLE_FIELDS_CONFIG as any)[filterPanelCategory]) ? (
             <div className="p-4 lg:p-5 border-l-4 flex flex-col lg:flex-row lg:items-end lg:gap-6 gap-4" style={{ borderLeftColor: 'var(--accent)' }}>
@@ -3667,56 +3619,6 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
             </div>
           ))}
         </div>
-      )}
-    </div>
-  );
-};
-
-const MySavedSearches: React.FC = () => {
-  const [list, setList] = useState<{ id: string; naziv: string | null; query: Record<string, unknown>; createdAt: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  useEffect(() => {
-    fetch(`${API_BASE}/saved-searches`, { headers: getAuthHeaders() })
-      .then(res => res.ok ? res.json() : [])
-      .then((data: any[]) => setList(Array.isArray(data) ? data : []))
-      .catch(() => setList([]))
-      .finally(() => setLoading(false));
-  }, []);
-  const buildSearchUrl = (query: Record<string, unknown>) => {
-    const q = { ...query };
-    const kategorija = q.kategorija as string | undefined;
-    delete q.kategorija;
-    const slug = kategorija ? CATEGORIES.find(c => c.id === kategorija)?.slug : undefined;
-    const path = slug ? `/kategorija/${slug}` : '/marketplace';
-    const params = new URLSearchParams();
-    Object.entries(q).forEach(([key, val]) => { if (val != null && String(val).trim() !== '') params.set(key, String(val)); });
-    const search = params.toString();
-    return search ? `${path}?${search}` : path;
-  };
-  const handleDelete = (id: string) => {
-    setDeletingId(id);
-    fetch(`${API_BASE}/saved-searches/${id}`, { method: 'DELETE', headers: getAuthHeaders() })
-      .then(res => { if (res.ok) setList(prev => prev.filter(x => x.id !== id)); })
-      .finally(() => setDeletingId(null));
-  };
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-widest">Spremljene pretrage</h1>
-      {loading ? (
-        <div className="space-y-3"><div className="h-14 rounded-xl bg-[#131C2B] animate-pulse" /><div className="h-14 rounded-xl bg-[#131C2B] animate-pulse" /></div>
-      ) : list.length === 0 ? (
-        <p className="text-[var(--text-secondary)] font-bold uppercase text-sm">Nemate spremljenih pretraga. Na stranici pretrage kliknite „Spremi pretragu” da sačuvate trenutne filtere.</p>
-      ) : (
-        <ul className="space-y-2">
-          {list.map((item) => (
-            <li key={item.id} className="flex items-center gap-3 p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-              <Link to={buildSearchUrl(item.query as Record<string, unknown>)} className="flex-1 min-w-0 font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{item.naziv || 'Pretraga'}</Link>
-              <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-secondary)' }}>{new Date(item.createdAt).toLocaleDateString()}</span>
-              <button type="button" onClick={() => handleDelete(item.id)} disabled={deletingId === item.id} className="p-2 rounded-lg border transition-colors" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>{deletingId === item.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
