@@ -11,6 +11,10 @@ export function getApiBaseForRedirect(): string {
     const fromEnv = env?.VITE_API_URL;
     if (isLocalHost && (!fromEnv || fromEnv.startsWith('/'))) return `http://localhost:3001/api`;
     if (fromEnv && typeof fromEnv === 'string' && fromEnv.trim() !== '') return fromEnv.trim().replace(/\/+$/, '');
+    // Fallback: Vercel frontend → Render backend (za Google prijavu itd.)
+    if (host.includes('povezi-me.vercel.app') || (host.endsWith('.vercel.app') && host.includes('povezi'))) {
+      return 'https://povezi-me.onrender.com/api';
+    }
   }
   return getApiBase();
 }
@@ -43,6 +47,10 @@ export function getApiBase(): string {
     const host = window.location.hostname;
     const isLocalHost = host === 'localhost' || host === '127.0.0.1';
     if (!isLocalHost) {
+      // Fallback za poznati production frontend na Vercelu – API je na Renderu
+      if (host.includes('povezi-me.vercel.app') || (host.endsWith('.vercel.app') && host.includes('povezi'))) {
+        return 'https://povezi-me.onrender.com/api';
+      }
       if (env?.MODE === 'production' && (!fromEnv || !fromEnv.trim())) {
         console.warn('[Povezi.ME] VITE_API_URL nije definisan u production build-u. Postavite VITE_API_URL pri build-u.');
       }
