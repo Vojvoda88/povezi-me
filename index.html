@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="sr-Latn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Poveži.ME - Premium Marketplace</title>
+  <meta name="description" content="Kupuj i prodaj brzo i sigurno u Crnoj Gori. Automobili, nekretnine, tehnika i još mnogo toga na Poveži.ME Premium Marketplace platformi.">
+  <link rel="canonical" href="https://povezi.me/" />
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Poveži.ME - Premium Marketplace">
+  <meta property="og:description" content="Kupuj i prodaj brzo i sigurno u Crnoj Gori. Automobili, nekretnine, tehnika i još mnogo toga.">
+  <meta property="og:url" content="https://povezi.me/">
+  <meta property="og:locale" content="sr_Latn">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Poveži.ME - Premium Marketplace">
+  <meta name="twitter:description" content="Kupuj i prodaj brzo i sigurno u Crnoj Gori.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* Tema: midnight (tamno) – svjetliji tekst za bolju čitljivost */
+    :root,
+    [data-theme="midnight"] {
+      --bg-page: #0B1220;
+      --bg-nav: #0f172a;
+      --bg-card: #131C2B;
+      --bg-menu: #0f172a;
+      --bg-input: #1e293b;
+      --accent: #4F6DFF;
+      --accent-hover: #3D56D6;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --border-subtle: rgba(255,255,255,0.08);
+      --premium-glow: 0 0 24px rgba(79, 109, 255, 0.35), 0 0 48px rgba(79, 109, 255, 0.12);
+      --premium-badge-glow: 0 0 12px rgba(79, 109, 255, 0.5);
+      --premium-inset: inset 0 0 40px rgba(79, 109, 255, 0.08);
+    }
+
+    /* Tema: light (svijetlo) – tamniji tekst za jasnoću */
+    [data-theme="light"] {
+      --bg-page: #f1f5f9;
+      --bg-nav: #ffffff;
+      --bg-card: #ffffff;
+      --bg-menu: #ffffff;
+      --bg-input: #e2e8f0;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --text-primary: #0c1222;
+      --text-secondary: #475569;
+      --border-subtle: #e2e8f0;
+      --premium-glow: 0 0 24px rgba(37, 99, 235, 0.4), 0 0 48px rgba(37, 99, 235, 0.18);
+      --premium-badge-glow: 0 0 12px rgba(37, 99, 235, 0.55);
+      --premium-inset: inset 0 0 40px rgba(37, 99, 235, 0.12);
+    }
+
+    html, body {
+      height: 100%;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden !important;
+      background-color: var(--bg-page);
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      transition: background-color 0.25s ease;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      width: 100%;
+    }
+
+    #root {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow-x: hidden;
+    }
+    
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Premium Transitions */
+    .tap-scale {
+      transition: transform 0.15s ease-out;
+    }
+    .tap-scale:active {
+      transform: scale(0.98);
+    }
+
+    /* Glass Effect */
+    .glass-nav {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* Safe Area Padding */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slide-up 0.4s ease-out forwards;
+    }
+
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .animate-slide-in-right {
+      animation: slide-in-right 0.3s ease-out forwards;
+    }
+
+    /* Donji meni (mobil) – uvek neprovidna pozadina iz teme */
+    .povezi-bottom-nav {
+      background-color: var(--bg-nav) !important;
+      background: var(--bg-nav) !important;
+    }
+
+    /* Sidebar meni – pozadina iz teme */
+    .povezi-profile-menu-panel {
+      background: var(--bg-menu) !important;
+      background-color: var(--bg-menu) !important;
+      opacity: 1 !important;
+    }
+    .povezi-profile-menu-panel a:hover {
+      background-color: var(--bg-input);
+    }
+
+    /* Brojčana polja bez strelica gore/dole (spinner) */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    /* Premium focus za filtere i forme – accent prsten */
+    .povezi-filter-input:focus,
+    .povezi-filter-select:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
+    }
+  </style>
+</head>
+<body data-theme="midnight">
+  <script>
+    try { var t = localStorage.getItem('povezi_theme'); if (t && ['midnight','light'].includes(t)) document.body.dataset.theme = t; } catch(e) {}
+    (function() {
+      if (window.location.search.indexOf('mobile=1') !== -1) {
+        var m = document.querySelector('meta[name=viewport]');
+        if (m) m.setAttribute('content', 'width=375, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+      }
+    })();
+  </script>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

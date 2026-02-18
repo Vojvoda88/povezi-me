@@ -1,0 +1,69 @@
+name: Frontend and Backend Label Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  check-violations:
+    name: Check File Violations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Frontend Changes
+        id: frontend-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            index.html
+            index.tsx
+            App.tsx
+            **/*.tsx
+            **/*.jsx
+            public/**
+
+      - name: Detect Backend Scope Violations
+        id: scope-files
+        if: contains(github.event.pull_request.labels.*.name, 'backend')
+        uses: tj-actions/changed-files@v45
+        with:
+          files_ignore: |
+            src/**
+            tests/**
+
+      - name: Validate and Fail
+        run: |
+          FAIL=0
+          
+          # Check for forbidden frontend modifications
+          if [[ "${{ steps.frontend-files.outputs.any_changed }}" == "true" ]]; then
+            echo "================================================================"
+            echo "ERROR: FORBIDDEN FRONTEND MODIFICATIONS DETECTED"
+            echo "================================================================"
+            echo "The following forbidden files were modified:"
+            echo "${{ steps.frontend-files.outputs.all_changed_files }}"
+            echo "================================================================"
+            FAIL=1
+          fi
+
+          # Check for backend label constraints (must stay within src/ and tests/)
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'backend') }}" == "true" ]]; then
+            if [[ "${{ steps.scope-files.outputs.any_changed }}" == "true" ]]; then
+              echo "================================================================"
+              echo "ERROR: BACKEND LABEL VIOLATION"
+              echo "================================================================"
+              echo "This PR is labeled 'backend' but contains changes outside of"
+              echo "the src/ and tests/ directories. Files detected:"
+              echo "${{ steps.scope-files.outputs.all_changed_files }}"
+              echo "================================================================"
+              FAIL=1
+            fi
+          fi
+
+          if [ $FAIL -eq 1 ]; then
+            exit 1
+          fi

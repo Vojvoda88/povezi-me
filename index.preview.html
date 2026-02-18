@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="sr-Latn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Poveži.ME - Premium Marketplace</title>
+  <meta name="description" content="Kupuj i prodaj brzo i sigurno u Crnoj Gori. Automobili, nekretnine, tehnika i još mnogo toga na Poveži.ME Premium Marketplace platformi.">
+  <link rel="canonical" href="https://povezi.me/" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --midnight-primary: #0B1220;
+      --midnight-secondary: #111827;
+      --card-midnight: #131C2B;
+      --accent-primary: #4F6DFF;
+      --accent-secondary: #7C8CFF;
+      --text-primary: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --border-subtle: rgba(255,255,255,0.06);
+    }
+
+    html, body {
+      height: 100%;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden !important;
+      background-color: #0b0f1a;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      width: 100%;
+    }
+
+    #root {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      overflow-x: hidden;
+    }
+    
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .tap-scale {
+      transition: transform 0.15s ease-out;
+    }
+    .tap-scale:active {
+      transform: scale(0.98);
+    }
+
+    .glass-nav {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slide-up 0.4s ease-out forwards;
+    }
+
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .animate-slide-in-right {
+      animation: slide-in-right 0.3s ease-out forwards;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

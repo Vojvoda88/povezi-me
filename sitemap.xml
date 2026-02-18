@@ -1,0 +1,29 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://povezi.me/</loc>
+    <priority>1.0</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://povezi.me/kategorija/automobili</loc>
+    <priority>0.8</priority>
+    <changefreq>hourly</changefreq>
+  </url>
+  <url>
+    <loc>https://povezi.me/kategorija/nekretnine</loc>
+    <priority>0.8</priority>
+    <changefreq>hourly</changefreq>
+  </url>
+  <url>
+    <loc>https://povezi.me/kategorija/tehnika</loc>
+    <priority>0.8</priority>
+    <changefreq>hourly</changefreq>
+  </url>
+  <url>
+    <loc>https://povezi.me/kategorija/namjestaj</loc>
+    <priority>0.8</priority>
+    <changefreq>daily</changefreq>
+  </url>
+</urlset>

@@ -1,0 +1,315 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AdStatus {
+  NA_CEKANJU  // čeka odobrenje administratora
+  AKTIVAN
+  PRODAN
+  ISTEKAO
+}
+
+model User {
+  id              String   @id @default(cuid())
+  ime             String
+  email           String   @unique
+  passwordHash    String
+  telefon         String
+  role            Role     @default(USER)
+  banned          Boolean  @default(false)
+  shadowBanned    Boolean  @default(false)
+  bannedReason    String?
+  datumRegistracije DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  ads             Ad[]
+  notifications   Notification[]
+  favorites       UserFavorite[]
+  reportedAds     Report[]  @relation("Reporter")
+  passwordResetTokens PasswordResetToken[]
+  payments        Payment[]
+  userConversations UserConversation[]
+  messagesSent    Message[]
+  conversations   Conversation[]  @relation("ConversationInitiator")
+  savedSearches   SavedSearch[]
+
+  @@index([email])
+  @@index([role])
+  @@index([banned])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  tip       String
+  naslov    String
+  poruka    String
+  link      String?
+  entityId  String?
+  milestone Int?
+  dedupeKey String   @unique
+  procitano Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, procitano])
+  @@index([userId, tip, entityId])
+}
+
+model UserFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  adId     String
+  createdAt DateTime @default(now())
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ad       Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, adId])
+  @@index([userId])
+  @@index([adId])
+}
+
+model Ad {
+  id             String    @id @default(cuid())
+  naslov         String
+  slug           String    @unique
+  opis           String
+  kategorija     String
+  potkategorija  String?
+  cijena         Decimal   @db.Decimal(10, 2)
+  lokacija       String
+  status         AdStatus  @default(NA_CEKANJU)
+  vlasnikId      String
+  pogledi        Int       @default(0)
+  expiresAt      DateTime?
+  featuredUntil  DateTime?
+  tipOglasa      String?   // prodajem | trazim
+  details        Json?     // nekretnine, auto_dijelovi, itd.
+  make           String?   // proizvođač (za motorna vozila) – display fallback
+  model          String?   // model (za motorna vozila) – display fallback
+  makeId         String?   // FK na VehicleMake (source of truth)
+  modelId        String?   // FK na VehicleModel (source of truth)
+  vehicleSpecs   Json?     // specifični podaci po podkategoriji
+  lastActivityAt DateTime  @default(now()) // bump/extend resetira; 50 dana bez aktivnosti => auto delete
+  deletedAt      DateTime? // soft delete za neaktivne
+  dedupeKey      String?   // sha256 fingerprint za duplicate prevention
+  titleNorm      String?   // normalized naslov (lowercase, no diacritics)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  vlasnik        User      @relation(fields: [vlasnikId], references: [id], onDelete: Restrict)
+  makeRef        VehicleMake?  @relation(fields: [makeId], references: [id], onDelete: SetNull)
+  modelRef       VehicleModel? @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  images         AdImage[]
+  favoritedBy    UserFavorite[]
+  reports        Report[]
+  payments       Payment[]
+  conversations  Conversation[]
+  viewThrottles  AdViewThrottle[]
+
+  @@index([kategorija])
+  @@index([kategorija, potkategorija])
+  @@index([make])
+  @@index([makeId])
+  @@index([tipOglasa])
+  @@index([createdAt])
+  @@index([vlasnikId])
+  @@index([status])
+  @@index([status, expiresAt])
+  @@index([status, featuredUntil])
+  @@index([status, kategorija])
+  @@index([status, deletedAt, featuredUntil, createdAt])
+  @@index([vlasnikId, createdAt])
+  @@index([vlasnikId, dedupeKey])
+  @@index([lastActivityAt])
+  @@index([deletedAt])
+}
+
+model AdViewThrottle {
+  id           String   @id @default(cuid())
+  adId         String
+  key          String   // user:userId ili ip:x.x.x.x
+  lastViewedAt DateTime @default(now())
+  ad           Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@unique([adId, key])
+  @@index([lastViewedAt])
+}
+
+model VehicleMake {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String
+  vehicleType String   // subcategory: automobili | motocikli | kamioni | kombi | autobusi | traktori | cetvorotockasi | prikolice | kamperi
+  order       Int      @default(0)
+  isPrimary   Boolean  @default(false) // glavne marke na vrh liste
+  models      VehicleModel[]
+  ads         Ad[]
+
+  @@unique([slug, vehicleType])
+  @@index([vehicleType])
+  @@index([vehicleType, isPrimary])
+}
+
+model VehicleModel {
+  id          String       @id @default(cuid())
+  makeId      String
+  name        String
+  slug        String
+  vehicleType String       // isti kao make.vehicleType (za brzi filter)
+  isPrimary   Boolean      @default(false) // glavni modeli na vrh
+  make        VehicleMake  @relation(fields: [makeId], references: [id], onDelete: Cascade)
+  ads         Ad[]
+
+  @@unique([makeId, slug])
+  @@index([makeId])
+  @@index([makeId, isPrimary])
+}
+
+model AdImage {
+  id       String @id @default(cuid())
+  url      String
+  thumbUrl String?
+  width    Int?
+  height   Int?
+  order    Int    @default(0)
+  adId     String
+  ad       Ad     @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId])
+}
+
+enum ReportStatus {
+  open
+  closed
+}
+
+model Report {
+  id             String      @id @default(cuid())
+  adId           String
+  reporterUserId String?
+  reason         String
+  details        String?
+  status         ReportStatus @default(open)
+  createdAt      DateTime    @default(now())
+  resolvedAt     DateTime?
+  ad             Ad          @relation(fields: [adId], references: [id], onDelete: Cascade)
+  reporter       User?       @relation("Reporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+
+  @@index([adId])
+  @@index([adId, reporterUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  entityType String   // USER | AD | REPORT | PAYMENT
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Payment {
+  id                   String   @id @default(cuid())
+  userId               String
+  adId                 String?
+  amount               Int      // cents
+  currency             String   @default("eur")
+  status               String   // pending | succeeded | failed | refunded
+  stripeSessionId      String   @unique
+  stripePaymentIntentId String?
+  planDays             Int?    // 7 | 14 | 30 for featured
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ad                   Ad?      @relation(fields: [adId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([stripeSessionId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Conversation {
+  id               String   @id @default(cuid())
+  adId             String?
+  initiatorId      String   // user who started (e.g. buyer)
+  createdAt        DateTime @default(now())
+  ad               Ad?      @relation(fields: [adId], references: [id], onDelete: SetNull)
+  initiator        User     @relation("ConversationInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  participants     UserConversation[]
+  messages         Message[]
+
+  @@index([adId])
+  @@index([initiatorId])
+  @@index([createdAt])
+}
+
+model UserConversation {
+  id             String       @id @default(cuid())
+  userId         String
+  conversationId String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime     @default(now())
+  isRead         Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  naziv     String?  // opcionalni naziv (npr. "VW Golf do 5000€")
+  query     Json     // parametri pretrage: kategorija, subcategory, q, lokacija, priceMin, priceMax, make, model, ...
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}

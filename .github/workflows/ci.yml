@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: povezi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/povezi_ci
+      JWT_SECRET: ci-test-jwt-secret-which-is-long-enough-1234567890
+      FRONTEND_URL: http://localhost:5173
+      PUBLIC_SITE_URL: http://localhost:5173
+      SUPABASE_URL: http://localhost:9999
+      SUPABASE_SERVICE_KEY: dummy
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_dummy
+      RESEND_API_KEY: test_dummy
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run migrations on CI database
+        env:
+          NODE_ENV: production
+          ALLOW_NONPROD_MIGRATE: '1'
+        run: npm run migrate:deploy
+
+      - name: Lint (if configured)
+        run: npm run lint --if-present
+
+      - name: Run unit tests
+        env:
+          NODE_ENV: test
+        run: npm test
+
+      - name: Build backend
+        env:
+          NODE_ENV: test
+        run: npm run build
+
+      - name: Build frontend
+        env:
+          NODE_ENV: test
+        run: npm run build:frontend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend + frontend for smoke and E2E
+        env:
+          NODE_ENV: production
+          TEST_MODE: 'true'
+        run: |
+          npm run e2e:serve > e2e-serve.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:5175 | grep -q 200; then
+              echo "Frontend je dostupan na portu 5175"
+              break
+            fi
+            if [ $i -eq 45 ]; then
+              echo "Frontend se nije pokrenuo"
+              cat e2e-serve.log
+              exit 1
+            fi
+            echo "Čekam frontend (pokušaj $i)..."
+            sleep 2
+          done
+          for i in $(seq 1 15); do
+            if nc -z localhost 3001 2>/dev/null; then
+              echo "Backend je dostupan na portu 3001"
+              break
+            fi
+            if [ $i -eq 15 ]; then
+              echo "Backend se nije pokrenuo"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run smoke tests
+        env:
+          SMOKE_BASE_URL: http://localhost:3001
+          NODE_ENV: test
+        run: npm run smoke-test
+
+      - name: Run E2E tests
+        env:
+          E2E_BASE_URL: http://localhost:5175
+          E2E_REUSE_SERVER: '1'
+        run: npx playwright test
+

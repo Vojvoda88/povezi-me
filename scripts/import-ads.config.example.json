@@ -1,0 +1,14 @@
+{
+  "importUserEmail": "import@povezi.me",
+  "defaultKategorija": "ostalo",
+  "defaultLokacija": "Crna Gora",
+  "sources": [
+    {
+      "name": "example-rss",
+      "type": "rss",
+      "url": "https://example.com/feed.xml",
+      "kategorija": "ostalo",
+      "lokacija": "Crna Gora"
+    }
+  ]
+}

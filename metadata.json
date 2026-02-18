@@ -1,0 +1,7 @@
+{
+  "name": "Poveži.ME Marketplace",
+  "description": "Premium marketplace platforma za Crnu Goru i region, sa podrškom za kategorizovane oglase, napredno filtriranje i chat sistem.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

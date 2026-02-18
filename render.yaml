@@ -1,0 +1,10 @@
+# Render Blueprint – Poveži.ME backend
+# Kad povežeš repo: Render prepoznaje build/start. Env varijable dodaj u Dashboard (Environment).
+
+services:
+  - type: web
+    runtime: node
+    name: povezi-me-api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
