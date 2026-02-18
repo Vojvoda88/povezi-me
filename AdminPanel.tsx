@@ -703,7 +703,7 @@ export const AdminPayments: React.FC = () => {
                 <tr key={p.id} className="border-b" style={{ borderColor: 'var(--border-subtle)' }}>
                   <td className="p-3">{new Date(p.createdAt).toLocaleDateString()}</td>
                   <td className="p-3">{p.user?.ime} ({p.user?.email})</td>
-                  <td className="p-3">{p.ad ? <Link to={`/oglas/${p.ad.slug}`} className="underline" style={{ color: 'var(--accent)' }}>{p.ad.naslov}</Link> : '—'}</td>
+                  <td className="p-3">{p.ad ? <Link to={`/oglas/${p.ad.slug}`} target="_self" className="underline" style={{ color: 'var(--accent)' }}>{p.ad.naslov}</Link> : '—'}</td>
                   <td className="p-3">{(p.amount / 100).toFixed(2)} {p.currency.toUpperCase()}</td>
                   <td className="p-3">{p.status}</td>
                   <td className="p-3">{p.planDays ? `${p.planDays} dana` : '—'}</td>

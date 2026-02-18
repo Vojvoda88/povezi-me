@@ -1779,6 +1779,8 @@ const AdCardInner: React.FC<{
     return (
       <Link
         to={to}
+        target="_self"
+        rel="noopener"
         className={className}
         onClick={() => {
           const y = typeof window !== 'undefined' ? (window.scrollY ?? window.pageYOffset ?? 0) : 0;
@@ -3129,7 +3131,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
             </div>
             {duplicateSlug && (
               <div className="flex flex-wrap gap-2 pl-8">
-                <Link to={`/oglas/${duplicateSlug}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors">
+                <Link to={`/oglas/${duplicateSlug}`} target="_self" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors">
                   Otvori postojeći oglas
                 </Link>
                 <Link to="/moji-oglasi" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-colors">
