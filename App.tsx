@@ -1936,6 +1936,18 @@ const AdDetail: React.FC<{
   const metrics = useMemo(() => ad ? getSellerMetrics(safeVlasnikId || '') : { avg: "5.0", count: 0 }, [ad, safeVlasnikId, ratings]);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
 
+  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  const [similarAds, setSimilarAds] = useState<Ad[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const similarAbortRef = useRef<AbortController | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [promoteError, setPromoteError] = useState('');
+
   useEffect(() => {
     if (!ad) return;
     const opis = ad.opis != null ? String(ad.opis) : '';
@@ -1945,24 +1957,6 @@ const AdDetail: React.FC<{
     return () => setPageMeta('Poveži.ME - Premium Marketplace', DEFAULT_DESCRIPTION);
   }, [ad?.id, ad?.naslov, ad?.opis, ad?.slike]);
 
-  if (adFromApi === undefined && !ad) return <div className="max-w-6xl mx-auto px-4 py-20"><div className="aspect-video bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-8 bg-[#131C2B] rounded-lg w-3/4 mt-6 animate-pulse" /></div>;
-  if (!ad) return (
-    <div className="max-w-6xl mx-auto px-4 py-20 text-center">
-      <p className="font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Oglas nije pronađen</p>
-      {fetchError && <button type="button" onClick={loadAd} className="px-4 py-2 rounded-xl text-sm font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Pokušaj ponovo</button>}
-      <p className="mt-4"><Link to="/marketplace" className="text-sm font-bold" style={{ color: 'var(--accent)' }}>← Nazad na oglase</Link></p>
-    </div>
-  );
-  const hasImages = Array.isArray(ad.slike) && ad.slike.length > 0;
-  const safeActiveIndex = hasImages ? Math.min(Math.max(activeImg, 0), ad.slike.length - 1) : 0;
-  const heroImage = hasImages ? ad.slike[safeActiveIndex] : undefined;
-
-  const isOwner = user && ad.vlasnikId === user.id;
-  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
-
-  const [similarAds, setSimilarAds] = useState<Ad[]>([]);
-  const [similarLoading, setSimilarLoading] = useState(false);
-  const similarAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!ad?.slug) { setSimilarAds([]); return; }
     if (similarAbortRef.current) similarAbortRef.current.abort();
@@ -1984,18 +1978,12 @@ const AdDetail: React.FC<{
     return () => { ctrl.abort(); similarAbortRef.current = null; };
   }, [ad?.slug]);
 
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetails, setReportDetails] = useState('');
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportSuccess, setReportSuccess] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [promoteError, setPromoteError] = useState('');
   const handleReportSubmit = () => {
     if (!user) { navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); return; }
     if (!reportReason.trim() || reportReason.trim().length < 3) { setReportError('Unesite razlog (min 3 znaka).'); return; }
     setReportError('');
     setReportLoading(true);
+    if (!ad) return;
     fetch(`${API_BASE}/ads/${ad.id}/report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -2009,6 +1997,19 @@ const AdDetail: React.FC<{
       })
       .catch(() => { setReportLoading(false); setReportError('Greška u mreži.'); });
   };
+
+  if (adFromApi === undefined && !ad) return <div className="max-w-6xl mx-auto px-4 py-20"><div className="aspect-video bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-8 bg-[#131C2B] rounded-lg w-3/4 mt-6 animate-pulse" /></div>;
+  if (!ad) return (
+    <div className="max-w-6xl mx-auto px-4 py-20 text-center">
+      <p className="font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Oglas nije pronađen</p>
+      {fetchError && <button type="button" onClick={loadAd} className="px-4 py-2 rounded-xl text-sm font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Pokušaj ponovo</button>}
+      <p className="mt-4"><Link to="/marketplace" className="text-sm font-bold" style={{ color: 'var(--accent)' }}>← Nazad na oglase</Link></p>
+    </div>
+  );
+  const hasImages = Array.isArray(ad.slike) && ad.slike.length > 0;
+  const safeActiveIndex = hasImages ? Math.min(Math.max(activeImg, 0), ad.slike.length - 1) : 0;
+  const heroImage = hasImages ? ad.slike[safeActiveIndex] : undefined;
+  const isOwner = user && ad.vlasnikId === user.id;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 animate-slide-up">
