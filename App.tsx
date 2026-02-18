@@ -2126,21 +2126,18 @@ const AdDetail: React.FC<{
                 {hasImages && heroImage ? <img src={getProxiedImageUrl(heroImage)} className="w-full h-full object-contain" alt={ad.naslov} width={800} height={600} decoding="async" fetchPriority="high" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-[#9CA3AF] text-sm uppercase">Nema slike</div>}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                 {hasImages && <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white border border-white/10 z-10 shadow-lg">{safeActiveIndex + 1} / {ad.slike.length}</div>}
+                {hasImages && ad.slike.length > 1 && (
+                  <>
+                    <button type="button" onClick={() => setActiveImg(safeActiveIndex <= 0 ? ad.slike.length - 1 : safeActiveIndex - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Prethodna slika">
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button type="button" onClick={() => setActiveImg(safeActiveIndex >= ad.slike.length - 1 ? 0 : safeActiveIndex + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Sljedeća slika">
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  </>
+                )}
              </div>
              {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getProxiedImageUrl(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
-            {/* Sve fotografije – pregled svih slika (važno za moderaciju i pregled cijelog sadržaja) */}
-            {hasImages && (
-              <div className="space-y-3 pt-2 border-t border-white/5">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Sve fotografije ({ad.slike.length})</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {ad.slike.map((img, i) => (
-                    <button key={i} type="button" onClick={() => setActiveImg(i)} className="aspect-square rounded-xl overflow-hidden border-2 border-white/10 hover:border-[#4F6DFF]/50 transition-all focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]">
-                      <img src={getProxiedImageUrl(img)} alt={`${ad.naslov} – slika ${i + 1}`} className="w-full h-full object-cover" width={400} height={400} decoding="async" loading="lazy" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
