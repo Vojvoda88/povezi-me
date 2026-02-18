@@ -754,25 +754,51 @@ const Marketplace: React.FC<{
   const [saveSearchLoading, setSaveSearchLoading] = useState(false);
   const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
+  const pendingScrollYRef = useRef<number | null>(null);
 
-  // Pri mountu: vrati scroll ako smo se vratili sa oglasa (sessionStorage ima spremljenu poziciju)
+  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa oglasa)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = sessionStorage.getItem('marketplaceScroll');
     if (!saved) return;
     const y = parseInt(saved, 10);
-    if (Number.isNaN(y) || y <= 0) return;
+    if (!Number.isNaN(y) && y > 0) pendingScrollYRef.current = y;
     sessionStorage.removeItem('marketplaceScroll');
-    // Više pokušaja jer se lista oglasa može kasnije iscrtati
-    const restore = () => window.scrollTo({ top: y, behavior: 'instant' });
-    restore();
-    const t1 = setTimeout(restore, 80);
-    const t2 = setTimeout(restore, 200);
-    const t3 = setTimeout(restore, 500);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
-  // Pri unmountu: spremi scroll poziciju (kad korisnik ode na oglas)
+  // Vrati scroll tek kad je lista oglasa učitana (da stranica ima visinu)
+  useEffect(() => {
+    if (typeof window === 'undefined' || adsLoading || pendingScrollYRef.current == null) return;
+    let applied = false;
+    const apply = () => {
+      if (pendingScrollYRef.current == null || applied) return;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      if (maxScroll <= 0) return; // Stranica još nema visinu
+      const y = Math.min(pendingScrollYRef.current, Math.max(0, maxScroll));
+      window.scrollTo({ top: y, behavior: 'instant' });
+      applied = true;
+      pendingScrollYRef.current = null;
+    };
+    apply();
+    const t1 = setTimeout(apply, 100);
+    const t2 = setTimeout(apply, 300);
+    const t3 = setTimeout(apply, 600);
+    const t4 = setTimeout(apply, 1000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+  }, [adsLoading, ads.length]);
+
+  // Spremi scroll poziciju na scroll event (da uvijek imamo najnoviju)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleScroll = () => {
+      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+      if (y > 0) sessionStorage.setItem('marketplaceScroll', String(Math.round(y)));
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Pri unmountu: spremi scroll poziciju (backup kad korisnik ode na oglas)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     return () => {
@@ -1873,10 +1899,15 @@ const AdDetail: React.FC<{
     return () => { if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; } };
   }, [loadAd]);
 
-  // Scroll na vrh kada se otvori oglas
+  // Scroll na vrh kada se otvori oglas (uvijek na vrh, bez obzira gdje si bio na marketplace)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'instant' });
+    scrollToTop();
+    const t1 = setTimeout(scrollToTop, 50);
+    const t2 = setTimeout(scrollToTop, 200);
+    const t3 = setTimeout(scrollToTop, 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [slug]);
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
@@ -3062,7 +3093,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     }
   };
 
-  if (step === 1) {
+  if (step === 1 || !category) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-12 animate-slide-up">
         <h1 className="text-3xl font-black uppercase tracking-widest mb-2 text-center" style={{ color: 'var(--text-primary)' }}>Odaberite kategoriju</h1>
@@ -3090,7 +3121,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     <div className="max-w-4xl mx-auto px-4 py-8 animate-slide-up">
       <div className="flex items-center gap-4 mb-10">
         <button onClick={() => setStep(1)} className="p-3 bg-[#131C2B] rounded-full text-[#9CA3AF] hover:text-white transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-        <h1 className="text-2xl font-black uppercase text-white tracking-widest">Nova Objava: {CATEGORIES.find(c => c.id === category)?.name}</h1>
+        <h1 className="text-2xl font-black uppercase text-white tracking-widest">Nova Objava: {category ? (CATEGORIES.find(c => c.id === category)?.name || 'Nepoznata kategorija') : 'Odaberite kategoriju'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
