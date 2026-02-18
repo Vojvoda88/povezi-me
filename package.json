@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "Poveži.ME Premium Marketplace",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "overrides": {
+    "esbuild": "0.21.5"
+  },
   "scripts": {
     "backend": "cross-env PORT=3001 ts-node-dev --respawn --transpile-only src/index.ts",
     "backend:3002": "cross-env PORT=3002 ts-node-dev --respawn --transpile-only src/index.ts",
