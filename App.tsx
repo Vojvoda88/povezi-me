@@ -2762,8 +2762,10 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
   const [submitError, setSubmitError] = useState<string>('');
   const [duplicateSlug, setDuplicateSlug] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
+  const submitErrorRef = useRef<HTMLDivElement>(null);
   const [formData, setFormData] = useState<any>({
     naslov: '', cijena: '', opis: '', lokacija: 'Podgorica', telefon: user?.telefon || '',
+    imePrezime: user?.ime || '',
     premium: false, instagram: '', facebook: '', viber: '', whatsapp: '',
     tipOglasa: 'prodajem',
     realEstateDetails: { tipNekretnine: '', tipPonude: 'prodaja', kvadratura: '', brojSoba: '', sprat: '' },
@@ -2953,6 +2955,8 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     if (opis.length < 10) { setSubmitError('Opis mora imati najmanje 10 znakova.'); return; }
     if (cijena === undefined || cijena === null || Number.isNaN(cijena) || cijena < 0) { setSubmitError('Unesite ispravnu cijenu (0 ili više).'); return; }
     if (!formData.lokacija) { setSubmitError('Odaberite lokaciju.'); return; }
+    const imePrezime = (formData.imePrezime || '').trim();
+    if (imePrezime.length < 2) { setSubmitError('Unesite ime i prezime za kontakt.'); return; }
     if (!telefon) { setSubmitError('Unesite kontakt telefon.'); return; }
     if (category === 'nekretnine' && !formData.realEstateDetails?.tipNekretnine) {
       setSubmitError('Za nekretnine odaberite tip nekretnine.'); return;
@@ -2970,6 +2974,8 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     } : undefined;
     const baseDetails = category === 'auto_dijelovi' ? { stanje: formData.details?.stanje || 'Polovno' } : (realEstateDetails as Record<string, unknown> | undefined);
     const contactDetails: Record<string, unknown> = { ...(baseDetails || {}) };
+    contactDetails.imeProdavca = imePrezime;
+    contactDetails.telefonProdavca = telefon;
     if ((formData.viber || '').trim()) contactDetails.viber = (formData.viber || '').trim();
     if ((formData.whatsapp || '').trim()) contactDetails.whatsapp = (formData.whatsapp || '').trim();
     const details = Object.keys(contactDetails).length ? contactDetails : baseDetails;
@@ -3027,6 +3033,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
 
     setDuplicateSlug(null);
     setSubmitLoading(true);
+    setSubmitError('');
     try {
       const res = await fetch(`${API_BASE}/ads`, {
         method: 'POST',
@@ -3048,12 +3055,19 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
         setSubmitError(typeof msg === 'string' ? msg : 'Greška pri objavi.');
         return;
       }
-      const mapped = mapApiAdToAd(data);
-      onAddAd(mapped);
-      onPublishSuccess?.();
-      navigate('/moji-oglasi?pending=1');
-    } catch {
-      setSubmitError('Greška u mreži. Provjerite internet i pokušajte ponovo.');
+      try {
+        const mapped = mapApiAdToAd(data);
+        onAddAd(mapped);
+        onPublishSuccess?.();
+        navigate('/moji-oglasi?pending=1');
+      } catch (mapErr) {
+        console.error('[AddAd] mapApiAdToAd', mapErr);
+        setSubmitError('Oglas je sačuvan, ali prikaz može biti nepotpun. Provjerite Moji oglasi.');
+        navigate('/moji-oglasi?pending=1');
+      }
+    } catch (err) {
+      console.error('[AddAd] submit error', err);
+      setSubmitError('Greška u mreži. Provjerite internet i pokušajte ponovo. Ako problem traje, backend može biti privremeno nedostupan.');
     } finally {
       setSubmitLoading(false);
     }
@@ -3077,6 +3091,12 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
 
   const vehicleFieldsConfig = category === MOTORNA_VOZILA_ID && vehicleSubcategory ? (VEHICLE_FIELDS_CONFIG as Record<string, Record<string, unknown>>)[vehicleSubcategory] : null;
 
+  useEffect(() => {
+    if (submitError && submitErrorRef.current) {
+      submitErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [submitError]);
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 animate-slide-up">
       <div className="flex items-center gap-4 mb-10">
@@ -3086,7 +3106,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {submitError && (
-          <div className="p-4 rounded-2xl border border-red-500/50 bg-red-500/10 text-red-200 text-sm space-y-3" role="alert">
+          <div ref={submitErrorRef} className="p-4 rounded-2xl border border-red-500/50 bg-red-500/10 text-red-200 text-sm space-y-3" role="alert">
             <div className="flex items-center gap-3">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
               <span>{submitError}</span>
@@ -3273,8 +3293,12 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
           <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Kontakt i Linkovi</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Ime i prezime *</label>
+              <input required type="text" placeholder="npr. Marko Marković" value={formData.imePrezime} onChange={e => setFormData({...formData, imePrezime: e.target.value})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" minLength={2} />
+            </div>
+            <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Telefon *</label>
-              <input required type="tel" value={formData.telefon} onChange={e => setFormData({...formData, telefon: e.target.value})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" />
+              <input required type="tel" value={formData.telefon} onChange={e => setFormData({...formData, telefon: e.target.value})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" placeholder="+382 67 123 456" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Instagram (@korisnik)</label>
@@ -3548,8 +3572,8 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
         <div className="mb-6 p-4 rounded-2xl border flex items-start gap-3" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--accent)' }}>
           <CheckCircle2 className="w-6 h-6 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
           <div>
-            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Oglas je poslan na odobrenje</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Biće vidljiv nakon što administrator provjeri sadržaj i odobri oglas.</p>
+            <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Oglas je poslan na pregled</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Administrator će pregledati oglas u roku od nekoliko sati. Oglas neće biti vidljiv na sajtu dok ga administrator ne odobri.</p>
             <button type="button" onClick={() => setSearchParams({})} className="text-[10px] font-bold uppercase mt-2" style={{ color: 'var(--accent)' }}>U redu</button>
           </div>
         </div>
