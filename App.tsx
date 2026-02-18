@@ -754,6 +754,28 @@ const Marketplace: React.FC<{
   const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
 
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (scrollRestoredRef.current) return;
+    scrollRestoredRef.current = true;
+    const saved = sessionStorage.getItem('marketplaceScroll');
+    if (!saved) return;
+    const y = parseInt(saved, 10);
+    if (!Number.isNaN(y)) {
+      window.scrollTo(0, y);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    return () => {
+      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+      sessionStorage.setItem('marketplaceScroll', String(y));
+    };
+  }, []);
+
   useEffect(() => {
     const m = window.matchMedia('(max-width: 1023px)');
     const handler = (e: MediaQueryListEvent) => setIsNarrowScreen(e.matches);
