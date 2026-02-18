@@ -794,13 +794,15 @@ const Marketplace: React.FC<{
   // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const saved = sessionStorage.getItem(ADS_LIST_SCROLL_KEY) || sessionStorage.getItem('marketplaceScroll');
-    if (!saved) return;
-    const y = parseInt(saved, 10);
-    if (!Number.isNaN(y) && y >= 0) {
-      pendingScrollYRef.current = y;
-      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    }
+    try {
+      const saved = sessionStorage.getItem(ADS_LIST_SCROLL_KEY) || sessionStorage.getItem('marketplaceScroll');
+      if (!saved) return;
+      const y = parseInt(saved, 10);
+      if (!Number.isNaN(y) && y >= 0) {
+        pendingScrollYRef.current = y;
+        if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      }
+    } catch (_) { /* sessionStorage može biti onemogućen */ }
   }, []);
 
   // Vrati scroll nakon što se lista renderuje (requestAnimationFrame + fallback timeouti)
@@ -808,16 +810,17 @@ const Marketplace: React.FC<{
     if (typeof window === 'undefined' || pendingScrollYRef.current == null) return;
     let applied = false;
     const apply = () => {
-      if (pendingScrollYRef.current == null || applied) return;
-      const savedY = pendingScrollYRef.current;
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      if (maxScroll <= 0) return;
-      const y = Math.min(savedY, Math.max(0, maxScroll));
-      window.scrollTo(0, y);
-      applied = true;
-      pendingScrollYRef.current = null;
-      sessionStorage.removeItem(ADS_LIST_SCROLL_KEY);
-      sessionStorage.removeItem('marketplaceScroll');
+      try {
+        if (pendingScrollYRef.current == null || applied) return;
+        const savedY = pendingScrollYRef.current;
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        if (maxScroll <= 0) return;
+        const y = Math.min(savedY, Math.max(0, maxScroll));
+        window.scrollTo(0, y);
+        applied = true;
+        pendingScrollYRef.current = null;
+        try { sessionStorage.removeItem(ADS_LIST_SCROLL_KEY); sessionStorage.removeItem('marketplaceScroll'); } catch (_) {}
+      } catch (_) { /* zaštita od crasha pri restore scrolla */ }
     };
     const raf = requestAnimationFrame(() => {
       apply();
@@ -840,8 +843,10 @@ const Marketplace: React.FC<{
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleScroll = () => {
-      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-      if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+      try {
+        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+      } catch (_) {}
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -851,8 +856,10 @@ const Marketplace: React.FC<{
   useEffect(() => {
     if (typeof window === 'undefined') return;
     return () => {
-      const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
-      if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+      try {
+        const y = typeof window.scrollY === 'number' ? window.scrollY : window.pageYOffset || 0;
+        if (y >= 0) sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(Math.round(y)));
+      } catch (_) {}
     };
   }, []);
 
@@ -1799,10 +1806,12 @@ const AdCardInner: React.FC<{
         rel="noopener"
         className={className}
         onClick={() => {
-          if (typeof window !== 'undefined') {
-            const y = Math.round(window.scrollY ?? window.pageYOffset ?? 0);
-            sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
-          }
+          try {
+            if (typeof window !== 'undefined') {
+              const y = Math.round(window.scrollY ?? window.pageYOffset ?? 0);
+              sessionStorage.setItem(ADS_LIST_SCROLL_KEY, String(y));
+            }
+          } catch (_) {}
           if (import.meta.env?.DEV) {
             console.log('[AdCard]', 'link clicked', { id: ad.id, slug: ad.slug, to });
           }
@@ -1912,10 +1921,14 @@ const AdDetail: React.FC<{
   // Detail stranica: uvijek kreni od vrha; isključi browser scroll restoration
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    const raf = requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }));
-    return () => cancelAnimationFrame(raf);
+    try {
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      const raf = requestAnimationFrame(() => {
+        try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_) {}
+      });
+      return () => cancelAnimationFrame(raf);
+    } catch (_) { /* zaštita od crasha */ }
   }, [slug]);
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
