@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
+import { AdDetailView } from './App';
+import { mapApiAdToAd } from './features/ads/mappers';
 
 const API_BASE = getApiBase();
 const TOKEN_KEY = 'povezi_access_token';
@@ -535,30 +537,37 @@ export const AdminPendingAds: React.FC = () => {
   );
 };
 
-// ----- Pregled oglasa (admin) – učitava preko admin API-ja, radi i za oglase na čekanju -----
-const AdminAdPreview: React.FC = () => {
+// ----- Pregled oglasa (admin) – ISTI layout kao public AdDetail, admin bar iznad -----
+type AdminAdPreviewProps = {
+  user: User | null;
+  onToggleFavorite: (id: string) => void;
+  favorites: string[];
+  ratings: Array<{ sellerId?: string; buyerId?: string; score: number }>;
+  onAddRating: (sellerId: string, score: number) => void;
+  getSellerMetrics: (sellerId: string) => { avg: string; count: number };
+  setPageMeta: (title: string, desc?: string, img?: string, url?: string) => void;
+};
+
+const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics, setPageMeta }) => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const url = slug ? `${API_BASE}/admin/ads/by-slug/${encodeURIComponent(slug)}` : null;
-  const { data: ad, loading, error, refetch } = useAdminFetch<{
-    id: string; slug: string; naslov: string; opis: string; cijena: number; status: string; kategorija: string; lokacija?: string;
-    images: { url: string; thumbUrl?: string }[];
-    vlasnik: { id: string; ime: string; telefon: string | null };
-  }>(url);
+  const { data: rawAd, loading, error, refetch } = useAdminFetch<any>(url);
 
   const approve = () => {
-    if (!ad) return;
-    fetch(`${API_BASE}/admin/ads/${ad.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status: 'AKTIVAN' }) })
+    if (!rawAd) return;
+    fetch(`${API_BASE}/admin/ads/${rawAd.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status: 'AKTIVAN' }) })
       .then(res => res.ok && navigate('/admin/pending'));
   };
   const reject = () => {
-    if (!ad || !window.confirm('Odbij ovaj oglas? (Oglas će biti obrisan.)')) return;
-    fetch(`${API_BASE}/admin/ads/${ad.id}`, { method: 'DELETE', headers: getAuthHeaders() })
+    if (!rawAd || !window.confirm('Odbij ovaj oglas? (Oglas će biti obrisan.)')) return;
+    fetch(`${API_BASE}/admin/ads/${rawAd.id}`, { method: 'DELETE', headers: getAuthHeaders() })
       .then(res => res.ok && navigate('/admin/pending'));
   };
 
-  if (loading && !ad) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} /></div>;
-  if (error || !ad) return (
+  if (loading && !rawAd) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} /></div>;
+  if (error || !rawAd) return (
     <div className="py-8" style={{ color: 'var(--text-secondary)' }}>
       {error || 'Oglas nije pronađen'}
       <button type="button" onClick={() => refetch()} className="ml-2 underline">Pokušaj ponovo</button>
@@ -566,34 +575,38 @@ const AdminAdPreview: React.FC = () => {
     </div>
   );
 
-  const imgUrl = ad.images?.[0]?.url ?? ad.images?.[0]?.thumbUrl;
+  let ad;
+  try {
+    ad = mapApiAdToAd(rawAd);
+  } catch (e) {
+    return (
+      <div className="py-8" style={{ color: 'var(--text-secondary)' }}>
+        Greška pri učitavanju oglasa
+        <Link to="/admin/pending" className="ml-2 underline">← Nazad na čekanju</Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-4">
-        <button type="button" onClick={() => navigate('/admin/pending')} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-subtle)' }}><ChevronLeft className="w-5 h-5" /></button>
-        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest">Pregled oglasa</h1>
-        <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: ad.status === 'NA_CEKANJU' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)', color: 'var(--text-primary)' }}>{ad.status}</span>
-      </div>
-      <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-        {imgUrl && <div className="aspect-video bg-black/20"><img src={imgUrl} alt="" className="w-full h-full object-contain" /></div>}
-        <div className="p-6 space-y-4">
-          <h2 className="text-2xl font-black text-white">{ad.naslov}</h2>
-          <p className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{Number(ad.cijena)} €</p>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{ad.kategorija}{ad.lokacija ? ` · ${ad.lokacija}` : ''}</p>
-          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ad.opis || '—'}</p>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Prodavac: {ad.vlasnik?.ime}{ad.vlasnik?.telefon ? ` · ${ad.vlasnik.telefon}` : ''}</p>
-        </div>
-        <div className="p-6 border-t flex flex-wrap gap-3" style={{ borderColor: 'var(--border-subtle)' }}>
-          <Link to="/admin/pending" className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>← Nazad na čekanju</Link>
-          {ad.status === 'NA_CEKANJU' && (
-            <>
-              <button type="button" onClick={approve} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase text-white" style={{ backgroundColor: 'var(--accent)' }}>Odobri oglas</button>
-              <button type="button" onClick={reject} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij (obriši)</button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    <AdDetailView
+      ad={ad}
+      isAdminPreview
+      adminActions={{ onApprove: approve, onReject: reject, backHref: '/admin/pending' }}
+      user={user}
+      onToggleFavorite={onToggleFavorite}
+      favorites={favorites}
+      ratings={ratings}
+      onAddRating={onAddRating}
+      getSellerMetrics={getSellerMetrics}
+      sellerAdsCount={1}
+      similarAds={[]}
+      similarLoading={false}
+      navigate={navigate}
+      location={location}
+      API_BASE={API_BASE}
+      getAuthHeaders={getAuthHeaders}
+      setPageMeta={setPageMeta}
+    />
   );
 };
 
@@ -733,7 +746,18 @@ function useDebounce<T>(value: T, ms: number): T {
   return debounced;
 }
 
-export const AdminRoutes: React.FC<{ user: User | null; onLogin: (u: User) => void }> = ({ user, onLogin }) => (
+type AdminRoutesProps = {
+  user: User | null;
+  onLogin: (u: User) => void;
+  onToggleFavorite?: (id: string) => void;
+  favorites?: string[];
+  ratings?: Array<{ adId?: string; sellerId?: string; userId?: string; buyerId?: string; score: number }>;
+  onAddRating?: (sellerId: string, score: number) => void;
+  getSellerMetrics?: (sellerId: string) => { avg: string; count: number };
+  setPageMeta?: (title: string, desc?: string, img?: string, url?: string) => void;
+};
+
+export const AdminRoutes: React.FC<AdminRoutesProps> = ({ user, onLogin, onToggleFavorite = () => {}, favorites = [], ratings = [], onAddRating = () => {}, getSellerMetrics = () => ({ avg: '0', count: 0 }), setPageMeta = () => {} }) => (
   <Routes>
     <Route path="/admin/login" element={user?.role === 'admin' ? <Navigate to="/admin" replace /> : <AdminLogin onLogin={onLogin} />} />
     <Route path="/admin" element={<AdminGuard user={user}><AdminLayout><AdminDashboard /></AdminLayout></AdminGuard>} />
@@ -741,7 +765,7 @@ export const AdminRoutes: React.FC<{ user: User | null; onLogin: (u: User) => vo
     <Route path="/admin/users/:id" element={<AdminGuard user={user}><AdminLayout><AdminUserDetail /></AdminLayout></AdminGuard>} />
     <Route path="/admin/ads" element={<AdminGuard user={user}><AdminLayout><AdminAds /></AdminLayout></AdminGuard>} />
     <Route path="/admin/pending" element={<AdminGuard user={user}><AdminLayout><AdminPendingAds /></AdminLayout></AdminGuard>} />
-    <Route path="/admin/oglas-preview/:slug" element={<AdminGuard user={user}><AdminLayout><AdminAdPreview /></AdminLayout></AdminGuard>} />
+    <Route path="/admin/oglas-preview/:slug" element={<AdminGuard user={user}><AdminLayout><AdminAdPreview user={user} onToggleFavorite={onToggleFavorite} favorites={favorites} ratings={ratings} onAddRating={onAddRating} getSellerMetrics={getSellerMetrics} setPageMeta={setPageMeta} /></AdminLayout></AdminGuard>} />
     <Route path="/admin/reports" element={<AdminGuard user={user}><AdminLayout><AdminReports /></AdminLayout></AdminGuard>} />
     <Route path="/admin/payments" element={<AdminGuard user={user}><AdminLayout><AdminPayments /></AdminLayout></AdminGuard>} />
   </Routes>

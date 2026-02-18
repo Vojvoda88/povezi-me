@@ -559,7 +559,16 @@ const AppContent: React.FC = () => {
   if (location.pathname.startsWith('/admin')) {
     return (
       <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-page)' }}><Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent)' }} /></div>}>
-        <AdminRoutes user={currentUser} onLogin={(u) => setCurrentUser(mapApiUserToUser(u))} />
+        <AdminRoutes
+          user={currentUser}
+          onLogin={(u) => setCurrentUser(mapApiUserToUser(u))}
+          onToggleFavorite={toggleFavorite}
+          favorites={favorites}
+          ratings={ratings}
+          onAddRating={addRating}
+          getSellerMetrics={getSellerMetrics}
+          setPageMeta={setPageMeta}
+        />
       </React.Suspense>
     );
   }
@@ -1982,6 +1991,353 @@ const AdCardInner: React.FC<{
 
 const AdCard = React.memo(AdCardInner);
 
+const SpecGrid = ({ details }: { details: any }) => {
+  if (!details || typeof details !== 'object') return null;
+  const specs = [];
+  if (details.marka) specs.push({ label: 'Marka', value: details.marka });
+  if (details.model) specs.push({ label: 'Model', value: details.model });
+  if (details.godiste) specs.push({ label: 'Godište', value: `${details.godiste}. god` });
+  if (details.kilometraza != null) specs.push({ label: 'Kilometraža', value: `${(Number(details.kilometraza) || 0).toLocaleString()} km` });
+  if (details.gorivo) specs.push({ label: 'Gorivo', value: details.gorivo });
+  if (details.mjenjac) specs.push({ label: 'Mjenjač', value: details.mjenjac });
+  if (details.snaga) specs.push({ label: 'Snaga', value: `${details.snaga} KS` });
+  if (details.snagaKW) specs.push({ label: 'Snaga', value: `${details.snagaKW} kW` });
+  if (details.snagaKS != null && !details.snaga) specs.push({ label: 'Snaga', value: `${details.snagaKS} KS` });
+  if (details.kubikaza) specs.push({ label: 'Kubikaža', value: `${details.kubikaza} cm3` });
+  if (details.karoserija) specs.push({ label: 'Karoserija', value: details.karoserija });
+  if (details.pogon) specs.push({ label: 'Pogon', value: details.pogon });
+  if (details.stanje) specs.push({ label: 'Stanje', value: details.stanje });
+  if (details.tip) specs.push({ label: 'Tip', value: details.tip });
+  return (<>{specs.map((s, i) => (<div key={i} className="bg-[#131C2B] border border-white/5 p-4 rounded-2xl flex flex-col gap-1 hover:border-[#4F6DFF]/30 group transition-all"><span className="text-[8px] font-black uppercase text-[#9CA3AF] tracking-widest group-hover:text-[#4F6DFF]">{s.label}</span><span className="text-xs font-bold text-[#F3F4F6] truncate">{s.value}</span></div>))}</>);
+};
+
+const RatingSection = ({ sellerId, user, onAddRating, metrics }: { sellerId: string, user: User | null, onAddRating: (sid: string, s: number) => void, metrics: { avg: string, count: number } }) => {
+  const [hoverRating, setHoverRating] = useState(0);
+  const isSelf = user?.id === sellerId;
+  return (
+    <div className="space-y-4 pt-8 border-t border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div><h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] mb-1">⭐ Ocijeni prodavca</h3></div>
+        {!isSelf && user && (<div className="flex items-center gap-1.5 bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{[1, 2, 3, 4, 5].map((s) => (<button key={s} onMouseEnter={() => setHoverRating(s)} onMouseLeave={() => setHoverRating(0)} onClick={() => onAddRating(sellerId, s)} className="transition-all active:scale-125 p-1"><Star className={`w-6 h-6 ${s <= (hoverRating || 0) ? 'fill-amber-400 text-amber-400' : 'text-white/20'}`} /></button>))}</div>)}
+      </div>
+      <div className="flex items-center gap-4 bg-white/5 p-6 rounded-xl border border-white/5"><div className="text-4xl font-black text-white">{metrics.avg}</div><div><div className="flex text-amber-400 gap-0.5 mb-1">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-10'}`} />)}</div><div className="text-[9px] text-[#9CA3AF] font-black uppercase tracking-widest">Bazirano na {metrics.count} recenzija</div></div></div>
+    </div>
+  );
+};
+
+export type AdDetailViewAdminActions = { onApprove: () => void; onReject: () => void; backHref: string };
+
+export type AdDetailViewOwnerActions = {
+  promoteError?: string;
+  onPromoteClick?: (planDays: number) => void;
+  onStatusChange?: (status: 'AKTIVAN' | 'PRODAN' | 'ISTEKAO') => void;
+  onDelete?: () => void;
+  onAdUpdated?: (ad: Ad) => void;
+};
+
+export const AdDetailView: React.FC<{
+  ad: Ad;
+  isAdminPreview?: boolean;
+  adminActions?: AdDetailViewAdminActions;
+  ownerActions?: AdDetailViewOwnerActions;
+  user: User | null;
+  onToggleFavorite: (id: string) => void;
+  favorites: string[];
+  ratings: Rating[];
+  onAddRating: (sellerId: string, score: number) => void;
+  getSellerMetrics: (sellerId: string) => { avg: string; count: number };
+  sellerAdsCount: number;
+  similarAds: Ad[];
+  similarLoading: boolean;
+  navigate: NavigateFunction;
+  location: Location;
+  API_BASE: string;
+  getAuthHeaders: () => Record<string, string>;
+  setPageMeta: (title: string, desc?: string, img?: string, url?: string) => void;
+}> = (props) => {
+  const { ad, isAdminPreview, adminActions, ownerActions, user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics, sellerAdsCount, similarAds, similarLoading, navigate, location, API_BASE, getAuthHeaders, setPageMeta } = props;
+  const [activeImg, setActiveImg] = useState(0);
+  const [proxyFailedUrls, setProxyFailedUrls] = useState<Set<string>>(new Set());
+  const [fullyFailedUrls, setFullyFailedUrls] = useState<Set<string>>(new Set());
+  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  useEffect(() => {
+    if (!ad) return;
+    const opis = ad.opis != null ? String(ad.opis) : '';
+    const desc = opis.slice(0, 160).replace(/\s+/g, ' ').trim() + (opis.length > 160 ? '…' : '');
+    const img = Array.isArray(ad.slike) && ad.slike.length > 0 ? ad.slike[0] : undefined;
+    setPageMeta(`${ad.naslov} - Poveži.ME`, desc, img ? getProxiedImageUrl(img) : undefined, typeof window !== 'undefined' ? window.location.href : undefined);
+    return () => setPageMeta('Poveži.ME - Premium Marketplace', DEFAULT_DESCRIPTION);
+  }, [ad?.id, ad?.naslov, ad?.opis, ad?.slike, setPageMeta]);
+
+  const getImageSrc = (url: string): string => {
+    if (fullyFailedUrls.has(url)) return TRANSPARENT_1X1;
+    if (proxyFailedUrls.has(url)) return url.startsWith('http://') ? 'https://' + url.slice(7) : url;
+    return getProxiedImageUrl(url);
+  };
+  const handleImageError = (rawUrl: string) => {
+    if (proxyFailedUrls.has(rawUrl)) setFullyFailedUrls(prev => new Set(prev).add(rawUrl));
+    else setProxyFailedUrls(prev => new Set(prev).add(rawUrl));
+  };
+  const handleReportSubmit = () => {
+    if (!user) { navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); return; }
+    if (!reportReason.trim() || reportReason.trim().length < 3) { setReportError('Unesite razlog (min 3 znaka).'); return; }
+    setReportError('');
+    setReportLoading(true);
+    if (!ad) return;
+    fetch(`${API_BASE}/ads/${ad.id}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ reason: reportReason.trim(), details: reportDetails.trim() || undefined })
+    })
+      .then((res) => res.json().then((data: { error?: string; message?: string }) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        setReportLoading(false);
+        if (ok) { setReportSuccess(true); setReportReason(''); setReportDetails(''); setTimeout(() => { setReportOpen(false); setReportSuccess(false); }, 1500); }
+        else setReportError(data?.error || 'Greška pri prijavi.');
+      })
+      .catch(() => { setReportLoading(false); setReportError('Greška u mreži.'); });
+  };
+
+  const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
+  const metrics = useMemo(() => ad ? getSellerMetrics(safeVlasnikId || '') : { avg: '5.0', count: 0 }, [ad, safeVlasnikId, getSellerMetrics]);
+  const hasImages = Array.isArray(ad.slike) && ad.slike.length > 0;
+  const safeActiveIndex = hasImages ? Math.min(Math.max(activeImg, 0), ad.slike.length - 1) : 0;
+  const heroImage = hasImages ? ad.slike[safeActiveIndex] : undefined;
+  const isOwner = user && ad.vlasnikId === user.id;
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 animate-slide-up">
+      {isAdminPreview && adminActions && (
+        <div className="flex flex-wrap items-center gap-4 mb-6 p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+          <Link to={adminActions.backHref} className="p-2 rounded-lg border flex items-center gap-2 font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}><ChevronLeft className="w-5 h-5" /> Nazad</Link>
+          <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: ad.status === 'NA_CEKANJU' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)', color: 'var(--text-primary)' }}>Pregled oglasa (admin){ad.status !== 'AKTIVAN' ? ` · ${ad.status}` : ''}</span>
+          {ad.status === 'NA_CEKANJU' && (
+            <>
+              <button type="button" onClick={adminActions.onApprove} className="px-4 py-2.5 rounded-xl text-xs font-black uppercase text-white" style={{ backgroundColor: 'var(--accent)' }}>Odobri oglas</button>
+              <button type="button" onClick={adminActions.onReject} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij (obriši)</button>
+            </>
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+        <div className="lg:col-span-8 space-y-8">
+          <div className="space-y-4">
+             <div className="aspect-[4/3] sm:aspect-video bg-[#0B1220] rounded-xl overflow-hidden border border-white/5 relative group shadow-2xl">
+                {hasImages && heroImage ? <img src={getImageSrc(heroImage)} onError={() => handleImageError(heroImage)} className="w-full h-full object-contain" alt={ad.naslov} width={800} height={600} decoding="async" fetchPriority="high" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-[#9CA3AF] text-sm uppercase">Nema slike</div>}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+                {hasImages && <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white border border-white/10 z-10 shadow-lg">{safeActiveIndex + 1} / {ad.slike.length}</div>}
+                {hasImages && ad.slike.length > 1 && (
+                  <>
+                    <button type="button" onClick={() => setActiveImg(safeActiveIndex <= 0 ? ad.slike.length - 1 : safeActiveIndex - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Prethodna slika">
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <button type="button" onClick={() => setActiveImg(safeActiveIndex >= ad.slike.length - 1 ? 0 : safeActiveIndex + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Sljedeća slika">
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  </>
+                )}
+             </div>
+             {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getImageSrc(img)} onError={() => handleImageError(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
+          </div>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
+            <h1 className="text-3xl lg:text-4xl font-black text-white uppercase tracking-tight leading-tight">{ad.naslov}</h1>
+            <div className="text-4xl font-black text-[#7C8CFF] tracking-tighter">{(Number(ad.cijena) || 0).toLocaleString()} €</div>
+          </div>
+          {(ad.kategorija === 'nekretnine' && ad.realEstateDetails) ? (
+          <div className="space-y-4 pt-4 border-t border-white/5">
+             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] flex items-center gap-2"><Settings2 className="w-3 h-3 text-[#4F6DFF]" /> Specifikacije nekretnine</h3>
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+               {ad.realEstateDetails.tipNekretnine && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Tip</span><span className="text-white font-bold">{NEKRETNINE_TIP.find(t => t.id === ad.realEstateDetails!.tipNekretnine)?.name || ad.realEstateDetails.tipNekretnine}</span></div>}
+               {ad.realEstateDetails.tipPonude && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Tip ponude</span><span className="text-white font-bold">{ad.realEstateDetails.tipPonude === 'izdavanje' ? 'Izdavanje' : 'Prodaja'}</span></div>}
+               {ad.realEstateDetails.kvadratura != null && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Kvadratura</span><span className="text-white font-bold">{ad.realEstateDetails.kvadratura} m²</span></div>}
+               {ad.realEstateDetails.brojSoba && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Broj soba</span><span className="text-white font-bold">{ad.realEstateDetails.brojSoba}</span></div>}
+               {ad.realEstateDetails.sprat != null && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Sprat</span><span className="text-white font-bold">{NEKRETNINE_SPRAT.find(s => s.id === ad.realEstateDetails!.sprat)?.name ?? ad.realEstateDetails.sprat}</span></div>}
+             </div>
+          </div>
+          ) : (ad.carDetails || ad.motorcycleDetails || (ad.details && typeof ad.details === 'object')) ? (
+          <div className="space-y-4 pt-4 border-t border-white/5">
+             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] flex items-center gap-2"><Settings2 className="w-3 h-3 text-[#4F6DFF]" /> Specifikacije</h3>
+             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3"><SpecGrid details={ad.carDetails || ad.motorcycleDetails || ad.details} /></div>
+             {((ad.details as any)?.oporama?.length > 0 || (ad.details as any)?.sigurnost?.length > 0) && (
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                 {(ad.details as any)?.sigurnost?.length > 0 && (
+                   <div className="p-4 rounded-2xl border border-white/5 bg-white/5">
+                     <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Sigurnost</h4>
+                     <div className="flex flex-wrap gap-2">{(ad.details as any).sigurnost.map((s: string, i: number) => <span key={i} className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white bg-white/10">{s}</span>)}</div>
+                   </div>
+                 )}
+                 {(ad.details as any)?.oporama?.length > 0 && (
+                   <div className="p-4 rounded-2xl border border-white/5 bg-white/5">
+                     <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Dodatna oprema</h4>
+                     <div className="flex flex-wrap gap-2">{(ad.details as any).oporama.map((o: string, i: number) => <span key={i} className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white bg-white/10">{o}</span>)}</div>
+                   </div>
+                 )}
+               </div>
+             )}
+          </div>
+          ) : null}
+          <div className="pt-4 border-t border-white/5 space-y-4">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Opis</h3>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ad.opis || '—'}</p>
+            {ad.lokacija && <p className="text-[10px] font-bold uppercase flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}><MapPin className="w-3 h-3" /> {ad.lokacija}</p>}
+          </div>
+        </div>
+        <div className="lg:col-span-4">
+          <div className="lg:sticky lg:top-24 space-y-6 rounded-2xl border p-6 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+            {isOwner && ownerActions ? (
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Ovo je vaš oglas</p>
+                <p className="text-white font-bold mb-4">Kontakt podaci se prikazuju samo posjetiocima.</p>
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><MapPin className="w-3 h-3 text-[#4F6DFF]" /> Lokacija</span><span className="text-white">{ad.lokacija}</span></div>
+                </div>
+                {ownerActions.onPromoteClick && (
+                  <div className="space-y-4">
+                    <p className="text-[10px] font-black uppercase text-[#9CA3AF]">Istakni oglas (plaćanje)</p>
+                    {ownerActions.promoteError && <p className="text-red-400 text-[10px]">{ownerActions.promoteError}</p>}
+                    <div className="grid grid-cols-3 gap-2">
+                      {([{ d: 7, price: 10 }, { d: 14, price: 16 }, { d: 30, price: 28 }] as const).map(({ d, price }) => (
+                        <button key={d} type="button" onClick={() => ownerActions.onPromoteClick?.(d)} className="p-3 rounded-xl border text-center transition-all hover:border-[#4F6DFF]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                          <span className="block font-black text-white">{price} €</span>
+                          <span className="text-[9px] uppercase" style={{ color: 'var(--text-secondary)' }}>{d} dana</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {ownerActions.onStatusChange && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Status</label>
+                    <select value={ad.status} disabled={ad.status === 'NA_CEKANJU'} onChange={(e) => ownerActions.onStatusChange?.(e.target.value as 'AKTIVAN' | 'PRODAN' | 'ISTEKAO')} className="w-full h-12 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-sm text-white font-bold disabled:opacity-70">
+                      <option value="NA_CEKANJU">Na čekanju</option>
+                      <option value="AKTIVAN">Aktivan</option>
+                      <option value="PRODAN">Prodano</option>
+                      <option value="ISTEKAO">Istekao</option>
+                    </select>
+                    {ad.status === 'NA_CEKANJU' && <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Oglas čeka odobrenje administratora.</p>}
+                  </div>
+                )}
+                {ownerActions.onDelete && (
+                  <button type="button" onClick={ownerActions.onDelete} className="w-full h-12 border border-red-500/50 text-red-400 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs hover:bg-red-500/10 transition-all"><Trash2 className="w-4 h-4" /> Obriši oglas</button>
+                )}
+                <Link to={`/moji-oglasi/uredi/${ad.id}`} className="w-full h-14 bg-gradient-to-r from-[#4F6DFF] to-[#7C8CFF] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg active:scale-95 transition-all">
+                  <Edit2 className="w-4 h-4" /> Uredi oglas
+                </Link>
+                <Link to="/moji-oglasi" className="block w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
+                  ← Moji oglasi
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    {!isOwner && (
+                      <button type="button" onClick={() => onToggleFavorite(ad.id)} className="p-2.5 rounded-xl border transition-all active:scale-95" style={{ borderColor: 'var(--border-subtle)', color: favorites.includes(ad.id) ? 'var(--accent)' : 'var(--text-secondary)' }} aria-label={favorites.includes(ad.id) ? 'Ukloni iz favorita' : 'Dodaj u favorite'}>
+                        <Heart className={`w-5 h-5 ${favorites.includes(ad.id) ? 'fill-current' : ''}`} />
+                      </button>
+                    )}
+                    <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>{sellerAdsCount} oglasa od prodavca</span>
+                  </div>
+                </div>
+                {(() => {
+                  const telefon = (ad.details as any)?.telefon ?? (ad.details as any)?.telefonProdavca ?? ad.kontaktTelefon;
+                  const hasTelefon = telefon != null && String(telefon).trim() !== '';
+                  const telefonNorm = hasTelefon ? String(telefon).replace(/\s/g, '').replace(/^\+/, '') : '';
+                  const digitsOnly = (s: string) => s.replace(/\D/g, '');
+                  const viberDigits = ((ad.details as any)?.viber != null && (ad.details as any)?.viber !== '') ? digitsOnly(String((ad.details as any).viber)) : digitsOnly(telefonNorm);
+                  const viberNum = viberDigits ? (viberDigits.startsWith('382') ? viberDigits : '382' + viberDigits.replace(/^0/, '')) : '';
+                  const viberHref = viberNum ? `viber://chat?number=${viberNum}` : '';
+                  const whatsappRaw = (ad.details as any)?.whatsapp ?? (telefonNorm ? digitsOnly(telefonNorm) : null);
+                  const whatsapp = whatsappRaw != null && digitsOnly(String(whatsappRaw)) !== '' ? (() => { const d = digitsOnly(String(whatsappRaw)); return d.startsWith('382') ? d : '382' + d.replace(/^0/, ''); })() : null;
+                  return (
+                    <>
+                      {hasTelefon && (
+                        <>
+                          {showPhoneNumber && (
+                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-white/5 p-3 rounded-xl border border-white/5" style={{ color: 'var(--text-secondary)' }}>
+                              <span className="flex items-center gap-2"><Phone className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Telefon</span>
+                              <span className="font-mono text-sm select-all" style={{ color: 'var(--text-primary)' }}>{telefon}</span>
+                            </div>
+                          )}
+                          <a href={`tel:${String(telefon).replace(/\s/g, '')}`} onClick={() => setShowPhoneNumber(true)} className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"><Phone className="w-4 h-4 fill-current" /> Pozovi prodavca</a>
+                        </>
+                      )}
+                      {viberHref && (
+                        <a href={viberHref} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#7360F2] hover:bg-[#6B56E8] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#7360F2]/25 active:scale-95 transition-all">
+                          <MessageCircle className="w-5 h-5" /> Pošalji poruku
+                        </a>
+                      )}
+                      {whatsapp && (
+                        <a href={`https://wa.me/${whatsapp.startsWith('382') ? whatsapp : '382' + whatsapp.replace(/^0/, '')}?text=${encodeURIComponent('Zdravo, zanima me ovaj oglas: ' + (typeof window !== 'undefined' ? window.location.href : ''))}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#25D366] hover:bg-[#22C55E] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#25D366]/25 active:scale-95 transition-all">
+                          <MessageCircle className="w-5 h-5" /> Kontaktiraj
+                        </a>
+                      )}
+                    </>
+                  );
+                })()}
+                {SHOW_CHAT && user && !isOwner && (
+                  <Link to={`/poruke?ad=${ad.id}`} className="w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
+                    <MessageCircle className="w-4 h-4" /> Poruka prodavcu
+                  </Link>
+                )}
+                <button type="button" onClick={() => setReportOpen(true)} className="w-full h-12 border border-white/10 rounded-2xl flex items-center justify-center gap-2 font-bold uppercase text-[10px] transition-colors" style={{ color: 'var(--text-secondary)' }}><AlertTriangle className="w-4 h-4" /> Prijavi oglas</button>
+              </>
+            )}
+           </div>
+            {!isOwner && (
+            <div className="mt-6 rounded-2xl border p-6 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+              <div className="flex items-center gap-5"><div className="w-20 h-20 bg-gradient-to-br from-[#4F6DFF] to-[#7C8CFF] rounded-full flex items-center justify-center font-black text-white text-3xl shadow-xl border-4 border-[#0B1220]">{getInitial((ad.details as any)?.imeProdavca ?? ad.kontaktIme)}</div><div><div className="text-white font-black text-xl flex items-center gap-2 mb-1">{(ad.details as any)?.imeProdavca ?? ad.kontaktIme}<ShieldCheck className="w-5 h-5 text-emerald-400" /></div><div className="flex items-center gap-1.5"><div className="flex text-amber-400">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-20'}`} />)}</div><span className="text-[10px] text-white/50 font-black uppercase tracking-widest">{metrics.avg} ({metrics.count})</span></div></div></div>
+              <RatingSection sellerId={ad.vlasnikId} user={user} onAddRating={onAddRating} metrics={metrics} />
+            </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {similarLoading && <div className="mt-12 max-w-6xl mx-auto px-4"><div className="h-8 w-48 rounded-lg bg-[#131C2B] animate-pulse mb-4" /><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">{[1,2,3,4].map(i => <div key={i} className="rounded-[18px] overflow-hidden aspect-square bg-[#131C2B] animate-pulse" />)}</div></div>}
+      {!similarLoading && similarAds.length > 0 && (
+        <div className="mt-12 max-w-6xl mx-auto px-4">
+          <h2 className="text-lg font-black uppercase tracking-wide mb-4" style={{ color: 'var(--text-primary)' }}>Slični oglasi</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
+            {similarAds.map((similar) => (
+              <AdCard key={similar.id} ad={similar} isFavorite={favorites.includes(similar.id)} onToggleFavorite={onToggleFavorite} imgWidth={400} />
+            ))}
+          </div>
+        </div>
+      )}
+      {reportOpen && createPortal(
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70" onClick={() => !reportLoading && setReportOpen(false)}>
+          <div className="rounded-2xl border p-6 w-full max-w-md shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Prijavi oglas</h3>
+            {reportSuccess ? <p className="text-sm mb-4" style={{ color: 'var(--accent)' }}>Prijava je zabilježena. Hvala.</p> : (
+              <>
+                {reportError && <p className="text-red-400 text-sm mb-2">{reportError}</p>}
+                <input type="text" value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Razlog prijave *" className="w-full h-12 rounded-xl px-4 border mb-3 outline-none text-sm" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
+                <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)} placeholder="Dodatne informacije (opciono)" rows={3} className="w-full rounded-xl px-4 py-3 border mb-4 outline-none text-sm resize-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setReportOpen(false)} disabled={reportLoading} className="flex-1 h-12 rounded-xl border font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
+                  <button type="button" onClick={handleReportSubmit} disabled={reportLoading} className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] text-white" style={{ backgroundColor: 'var(--accent)' }}>{reportLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Pošalji'}</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AdDetail: React.FC<{ 
   ads: Ad[], user: User | null, onToggleFavorite: (id: string) => void, favorites: string[], ratings: Rating[], onAddRating: (sellerId: string, score: number) => void, getSellerMetrics: (sellerId: string) => { avg: string, count: number }
 }> = ({ ads, user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics }) => {
@@ -1989,10 +2345,6 @@ const AdDetail: React.FC<{
   const navigate = useNavigate();
   const location = useLocation();
   const [adFromApi, setAdFromApi] = useState<Ad | null | undefined>(undefined);
-  const [activeImg, setActiveImg] = useState(0);
-  const [proxyFailedUrls, setProxyFailedUrls] = useState<Set<string>>(new Set());
-  const [fullyFailedUrls, setFullyFailedUrls] = useState<Set<string>>(new Set());
-
   const [fetchError, setFetchError] = useState<boolean>(false);
   const abortRef = useRef<AbortController | null>(null);
   const loadAd = useCallback(() => {
@@ -2057,42 +2409,12 @@ const AdDetail: React.FC<{
     } catch (_) { /* zaštita od crasha */ }
   }, [slug]);
 
-  useEffect(() => { setProxyFailedUrls(new Set()); setFullyFailedUrls(new Set()); }, [slug]);
-
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
-  const getImageSrc = (url: string): string => {
-    if (fullyFailedUrls.has(url)) return TRANSPARENT_1X1;
-    if (proxyFailedUrls.has(url)) return url.startsWith('http://') ? 'https://' + url.slice(7) : url;
-    return getProxiedImageUrl(url);
-  };
-  const handleImageError = (rawUrl: string) => {
-    if (proxyFailedUrls.has(rawUrl)) setFullyFailedUrls(prev => new Set(prev).add(rawUrl));
-    else setProxyFailedUrls(prev => new Set(prev).add(rawUrl));
-  };
-  const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
-  const metrics = useMemo(() => ad ? getSellerMetrics(safeVlasnikId || '') : { avg: "5.0", count: 0 }, [ad, safeVlasnikId, ratings]);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
 
-  const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [similarAds, setSimilarAds] = useState<Ad[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const similarAbortRef = useRef<AbortController | null>(null);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetails, setReportDetails] = useState('');
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportSuccess, setReportSuccess] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [promoteError, setPromoteError] = useState('');
-
-  useEffect(() => {
-    if (!ad) return;
-    const opis = ad.opis != null ? String(ad.opis) : '';
-    const desc = opis.slice(0, 160).replace(/\s+/g, ' ').trim() + (opis.length > 160 ? '…' : '');
-    const img = Array.isArray(ad.slike) && ad.slike.length > 0 ? ad.slike[0] : undefined;
-    setPageMeta(`${ad.naslov} - Poveži.ME`, desc, img ? getProxiedImageUrl(img) : undefined, typeof window !== 'undefined' ? window.location.href : undefined);
-    return () => setPageMeta('Poveži.ME - Premium Marketplace', DEFAULT_DESCRIPTION);
-  }, [ad?.id, ad?.naslov, ad?.opis, ad?.slike]);
 
   useEffect(() => {
     if (!ad?.slug) { setSimilarAds([]); return; }
@@ -2115,25 +2437,8 @@ const AdDetail: React.FC<{
     return () => { ctrl.abort(); similarAbortRef.current = null; };
   }, [ad?.slug]);
 
-  const handleReportSubmit = () => {
-    if (!user) { navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); return; }
-    if (!reportReason.trim() || reportReason.trim().length < 3) { setReportError('Unesite razlog (min 3 znaka).'); return; }
-    setReportError('');
-    setReportLoading(true);
-    if (!ad) return;
-    fetch(`${API_BASE}/ads/${ad.id}/report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({ reason: reportReason.trim(), details: reportDetails.trim() || undefined })
-    })
-      .then((res) => res.json().then((data: { error?: string; message?: string }) => ({ ok: res.ok, data })))
-      .then(({ ok, data }) => {
-        setReportLoading(false);
-        if (ok) { setReportSuccess(true); setReportReason(''); setReportDetails(''); setTimeout(() => { setReportOpen(false); setReportSuccess(false); }, 1500); }
-        else setReportError(data?.error || 'Greška pri prijavi.');
-      })
-      .catch(() => { setReportLoading(false); setReportError('Greška u mreži.'); });
-  };
+  const [promoteError, setPromoteError] = useState('');
+  const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
 
   if (adFromApi === undefined && !ad) return <div className="max-w-6xl mx-auto px-4 py-20"><div className="aspect-video bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-8 bg-[#131C2B] rounded-lg w-3/4 mt-6 animate-pulse" /></div>;
   if (!ad) return (
@@ -2143,239 +2448,51 @@ const AdDetail: React.FC<{
       <p className="mt-4"><Link to="/marketplace" className="text-sm font-bold" style={{ color: 'var(--accent)' }}>← Nazad na oglase</Link></p>
     </div>
   );
-  const hasImages = Array.isArray(ad.slike) && ad.slike.length > 0;
-  const safeActiveIndex = hasImages ? Math.min(Math.max(activeImg, 0), ad.slike.length - 1) : 0;
-  const heroImage = hasImages ? ad.slike[safeActiveIndex] : undefined;
+
   const isOwner = user && ad.vlasnikId === user.id;
-
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 animate-slide-up">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-        <div className="lg:col-span-8 space-y-8">
-          <div className="space-y-4">
-             <div className="aspect-[4/3] sm:aspect-video bg-[#0B1220] rounded-xl overflow-hidden border border-white/5 relative group shadow-2xl">
-                {hasImages && heroImage ? <img src={getImageSrc(heroImage)} onError={() => handleImageError(heroImage)} className="w-full h-full object-contain" alt={ad.naslov} width={800} height={600} decoding="async" fetchPriority="high" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-[#9CA3AF] text-sm uppercase">Nema slike</div>}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-                {hasImages && <div className="absolute top-6 right-6 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white border border-white/10 z-10 shadow-lg">{safeActiveIndex + 1} / {ad.slike.length}</div>}
-                {hasImages && ad.slike.length > 1 && (
-                  <>
-                    <button type="button" onClick={() => setActiveImg(safeActiveIndex <= 0 ? ad.slike.length - 1 : safeActiveIndex - 1)} className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Prethodna slika">
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
-                    <button type="button" onClick={() => setActiveImg(safeActiveIndex >= ad.slike.length - 1 ? 0 : safeActiveIndex + 1)} className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 flex items-center justify-center text-white shadow-xl transition-all active:scale-95" aria-label="Sljedeća slika">
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
-                  </>
-                )}
-             </div>
-             {hasImages && ad.slike.length > 1 && (<div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">{ad.slike.map((img, i) => <button key={i} onClick={() => setActiveImg(i)} className={`w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? 'border-[#4F6DFF] scale-95 shadow-lg shadow-[#4F6DFF]/20' : 'border-white/5 opacity-60 hover:opacity-100'}`}><img src={getImageSrc(img)} onError={() => handleImageError(img)} className="w-full h-full object-cover" alt="" width={80} height={80} decoding="async" fetchPriority="low" loading="lazy" /></button>)}</div>)}
-          </div>
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3"><span className="px-3 py-1 bg-[#4F6DFF]/10 text-[#7C8CFF] text-[10px] font-black uppercase rounded-lg border border-[#4F6DFF]/20">{ad.kategorija}</span><span className="text-[10px] text-[#9CA3AF] font-bold uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> Objavljeno {timeAgo(typeof ad.createdAt === 'number' ? ad.createdAt : (ad.createdAt ? new Date(ad.createdAt).getTime() : Date.now()))}</span></div>
-            <h1 className="text-3xl lg:text-4xl font-black text-white uppercase tracking-tight leading-tight">{ad.naslov}</h1>
-            <div className="text-4xl font-black text-[#7C8CFF] tracking-tighter">{(Number(ad.cijena) || 0).toLocaleString()} €</div>
-          </div>
-          {(ad.kategorija === 'nekretnine' && ad.realEstateDetails) ? (
-          <div className="space-y-4 pt-4 border-t border-white/5">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] flex items-center gap-2"><Settings2 className="w-3 h-3 text-[#4F6DFF]" /> Specifikacije nekretnine</h3>
-             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-               {ad.realEstateDetails.tipNekretnine && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Tip</span><span className="text-white font-bold">{NEKRETNINE_TIP.find(t => t.id === ad.realEstateDetails!.tipNekretnine)?.name || ad.realEstateDetails.tipNekretnine}</span></div>}
-               {ad.realEstateDetails.tipPonude && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Tip ponude</span><span className="text-white font-bold">{ad.realEstateDetails.tipPonude === 'izdavanje' ? 'Izdavanje' : 'Prodaja'}</span></div>}
-               {ad.realEstateDetails.kvadratura != null && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Kvadratura</span><span className="text-white font-bold">{ad.realEstateDetails.kvadratura} m²</span></div>}
-               {ad.realEstateDetails.brojSoba && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Broj soba</span><span className="text-white font-bold">{ad.realEstateDetails.brojSoba}</span></div>}
-               {ad.realEstateDetails.sprat && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Spratnost</span><span className="text-white font-bold">{NEKRETNINE_SPRAT.find(s => s.id === ad.realEstateDetails!.sprat)?.name || ad.realEstateDetails.sprat}</span></div>}
-             </div>
-          </div>
-          ) : (
-          <div className="space-y-4 pt-4 border-t border-white/5">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] flex items-center gap-2"><Settings2 className="w-3 h-3 text-[#4F6DFF]" /> Specifikacije Vozila</h3>
-             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{ad.carDetails && <SpecGrid details={ad.carDetails} />}{ad.motorcycleDetails && <SpecGrid details={ad.motorcycleDetails} />}{!ad.carDetails && !ad.motorcycleDetails && <div className="col-span-full p-4 bg-white/5 rounded-2xl border border-white/5 text-[10px] text-[#9CA3AF] font-bold uppercase text-center">Osnovni podaci oglasa</div>}</div>
-             {((ad.details as any)?.oporama?.length > 0 || (ad.details as any)?.sigurnost?.length > 0) && (
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                 {(ad.details as any)?.sigurnost?.length > 0 && (
-                   <div className="p-4 rounded-2xl border border-white/5 bg-white/5">
-                     <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Sigurnost</h4>
-                     <div className="flex flex-wrap gap-2">{(ad.details as any).sigurnost.map((s: string, i: number) => <span key={i} className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white bg-white/10">{s}</span>)}</div>
-                   </div>
-                 )}
-                 {(ad.details as any)?.oporama?.length > 0 && (
-                   <div className="p-4 rounded-2xl border border-white/5 bg-white/5">
-                     <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Dodatna oprema</h4>
-                     <div className="flex flex-wrap gap-2">{(ad.details as any).oporama.map((o: string, i: number) => <span key={i} className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white bg-white/10">{o}</span>)}</div>
-                   </div>
-                 )}
-               </div>
-             )}
-          </div>
-          )}
-          <div className="space-y-4">
-             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Opis oglasa</h3>
-             <div className="bg-[#131C2B] border border-white/5 p-6 lg:p-8 rounded-xl shadow-xl"><p className="text-[#F3F4F6] leading-relaxed whitespace-pre-wrap text-sm lg:text-base opacity-90">{ad.opis != null ? String(ad.opis) : ''}</p></div>
-          </div>
-          {!isOwner && <RatingSection sellerId={safeVlasnikId} user={user} onAddRating={onAddRating} metrics={metrics} />}
-        </div>
-        <div className="lg:col-span-4 space-y-6">
-           <div className="lg:sticky lg:top-28 space-y-6">
-              {isOwner ? (
-                <div className="bg-[#131C2B] border border-white/5 rounded-xl p-8 shadow-2xl space-y-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Ovo je vaš oglas</p>
-                  <p className="text-white font-bold mb-4">Kontakt podaci se prikazuju samo posjetiocima.</p>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><MapPin className="w-3 h-3 text-[#4F6DFF]" /> Lokacija</span><span className="text-white">{ad.lokacija}</span></div>
-                  </div>
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black uppercase text-[#9CA3AF]">Istakni oglas (plaćanje)</p>
-                    {promoteError && <p className="text-red-400 text-[10px]">{promoteError}</p>}
-                    <div className="grid grid-cols-3 gap-2">
-                      {([{ d: 7, price: 10 }, { d: 14, price: 16 }, { d: 30, price: 28 }] as const).map(({ d, price }) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => {
-                            setPromoteError('');
-                            if (!user) { navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); return; }
-                            fetch(`${API_BASE}/payments/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ adId: ad.id, planDays: d }) })
-                              .then((res) => res.json().then((data: { url?: string; error?: string }) => ({ status: res.status, data })))
-                              .then(({ status, data }) => { if (status === 401) navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); else if (data?.url) window.location.href = data.url; else if (data?.error) setPromoteError(data.error); });
-                          }}
-                          className="p-3 rounded-xl border text-center transition-all hover:border-[#4F6DFF]"
-                          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                        >
-                          <span className="block font-black text-white">{price} €</span>
-                          <span className="text-[9px] uppercase" style={{ color: 'var(--text-secondary)' }}>{d} dana</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Status</label>
-                    <select
-                      value={ad.status}
-                      disabled={ad.status === 'NA_CEKANJU'}
-                      onChange={(e) => {
-                        const status = e.target.value as 'AKTIVAN' | 'PRODAN' | 'ISTEKAO';
-                        if (status === 'PRODAN' && !window.confirm('Označiti kao prodan? Oglas će biti trajno uklonjen.')) return;
-                        fetch(`${API_BASE}/ads/my/${ad.id}`, status === 'PRODAN'
-                          ? { method: 'DELETE', headers: getAuthHeaders() }
-                          : { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status }) })
-                          .then(res => {
-                            if (res.ok && status === 'PRODAN') navigate('/moji-oglasi');
-                            if (res.ok && status !== 'PRODAN') res.json().then((data: any) => setAdFromApi(mapApiAdToAd(data)));
-                          });
-                      }}
-                      className="w-full h-12 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-sm text-white font-bold disabled:opacity-70"
-                    >
-                      <option value="NA_CEKANJU">Na čekanju</option>
-                      <option value="AKTIVAN">Aktivan</option>
-                      <option value="PRODAN">Prodano</option>
-                      <option value="ISTEKAO">Istekao</option>
-                    </select>
-                    {ad.status === 'NA_CEKANJU' && <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Oglas čeka odobrenje administratora.</p>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm('Obrisati ovaj oglas?')) return;
-                      fetch(`${API_BASE}/ads/my/${ad.id}`, { method: 'DELETE', headers: getAuthHeaders() })
-                        .then(res => { if (res.ok) navigate('/moji-oglasi'); });
-                    }}
-                    className="w-full h-12 border border-red-500/50 text-red-400 rounded-2xl flex items-center justify-center gap-2 font-black uppercase text-xs hover:bg-red-500/10 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" /> Obriši oglas
-                  </button>
-                  <Link to={`/moji-oglasi/uredi/${ad.id}`} className="w-full h-14 bg-gradient-to-r from-[#4F6DFF] to-[#7C8CFF] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg active:scale-95 transition-all">
-                    <Edit2 className="w-4 h-4" /> Uredi oglas
-                  </Link>
-                  <Link to="/moji-oglasi" className="block w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
-                    ← Moji oglasi
-                  </Link>
-                </div>
-              ) : (
-              <div className="bg-[#131C2B] border border-white/5 rounded-xl p-8 shadow-2xl relative overflow-hidden group">
-                 <div className="space-y-6">
-                    <div className="flex items-center gap-5"><div className="w-20 h-20 bg-gradient-to-br from-[#4F6DFF] to-[#7C8CFF] rounded-full flex items-center justify-center font-black text-white text-3xl shadow-xl border-4 border-[#0B1220]">{getInitial((ad.details as any)?.imeProdavca ?? ad.kontaktIme)}</div><div><div className="text-white font-black text-xl flex items-center gap-2 mb-1">{(ad.details as any)?.imeProdavca ?? ad.kontaktIme}<ShieldCheck className="w-5 h-5 text-emerald-400" /></div><div className="flex items-center gap-1.5"><div className="flex text-amber-400">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-20'}`} />)}</div><span className="text-[10px] text-white/50 font-black uppercase tracking-widest">{metrics.avg} ({metrics.count})</span></div></div></div>
-                    <div className="space-y-2"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><MapPin className="w-3 h-3 text-[#4F6DFF]" /> Lokacija</span><span className="text-white">{ad.lokacija}</span></div><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-[#9CA3AF] bg-white/5 p-3 rounded-xl border border-white/5"><span className="flex items-center gap-2"><LayoutDashboard className="w-3 h-3 text-[#4F6DFF]" /> Aktivni oglasi</span><span className="text-white">{sellerAdsCount}</span></div>{user && sellerAdsCount > 0 && safeVlasnikId && (<Link to={`/prodavac/${safeVlasnikId}`} className="block w-full h-12 border border-white/10 text-white rounded-xl flex items-center justify-center gap-2 font-bold uppercase text-[10px] hover:bg-white/5 transition-all"><LayoutDashboard className="w-4 h-4" /> Pogledaj sve oglase</Link>)}</div>
-                    {(() => {
-                    const telefon = (ad.details as any)?.telefonProdavca ?? ad.kontaktTelefon;
-                    const hasTelefon = telefon != null && String(telefon).trim() !== '';
-                    const telefonNorm = hasTelefon ? String(telefon).replace(/\s/g, '').replace(/^\+/, '') : '';
-                    const digitsOnly = (s: string) => s.replace(/\D/g, '');
-                    const viberDigits = ((ad.details as any)?.viber != null && (ad.details as any)?.viber !== '') ? digitsOnly(String((ad.details as any).viber)) : digitsOnly(telefonNorm);
-                    const viberNum = viberDigits ? (viberDigits.startsWith('382') ? viberDigits : '382' + viberDigits.replace(/^0/, '')) : '';
-                    const viberHref = viberNum ? `viber://chat?number=${viberNum}` : '';
-                    const whatsappRaw = (ad.details as any)?.whatsapp ?? (telefonNorm ? digitsOnly(telefonNorm) : null);
-                    const whatsapp = whatsappRaw != null && digitsOnly(String(whatsappRaw)) !== '' ? (() => { const d = digitsOnly(String(whatsappRaw)); return d.startsWith('382') ? d : '382' + d.replace(/^0/, ''); })() : null;
-                    return (
-                      <>
-                        {hasTelefon && (
-                          <>
-                            {showPhoneNumber && (
-                              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest bg-white/5 p-3 rounded-xl border border-white/5" style={{ color: 'var(--text-secondary)' }}>
-                                <span className="flex items-center gap-2"><Phone className="w-3 h-3" style={{ color: 'var(--accent)' }} /> Telefon</span>
-                                <span className="font-mono text-sm select-all" style={{ color: 'var(--text-primary)' }}>{telefon}</span>
-                              </div>
-                            )}
-                            <a href={`tel:${String(telefon).replace(/\s/g, '')}`} onClick={() => setShowPhoneNumber(true)} className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"><Phone className="w-4 h-4 fill-current" /> Pozovi prodavca</a>
-                          </>
-                        )}
-                        {viberHref && (
-                          <a href={viberHref} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#7360F2] hover:bg-[#6B56E8] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#7360F2]/25 active:scale-95 transition-all">
-                            <MessageCircle className="w-5 h-5" /> Pošalji poruku
-                          </a>
-                        )}
-                        {whatsapp && (
-                          <a href={`https://wa.me/${whatsapp.startsWith('382') ? whatsapp : '382' + whatsapp.replace(/^0/, '')}?text=${encodeURIComponent('Zdravo, zanima me ovaj oglas: ' + (typeof window !== 'undefined' ? window.location.href : ''))}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#25D366] hover:bg-[#22C55E] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#25D366]/25 active:scale-95 transition-all">
-                            <MessageCircle className="w-5 h-5" /> Kontaktiraj
-                          </a>
-                        )}
-                      </>
-                    );
-                  })()}
-                  {SHOW_CHAT && user && !isOwner && (
-                    <Link to={`/poruke?ad=${ad.id}`} className="w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
-                      <MessageCircle className="w-4 h-4" /> Poruka prodavcu
-                    </Link>
-                  )}
-                  <button type="button" onClick={() => setReportOpen(true)} className="w-full h-12 border border-white/10 rounded-2xl flex items-center justify-center gap-2 font-bold uppercase text-[10px] transition-colors" style={{ color: 'var(--text-secondary)' }}><AlertTriangle className="w-4 h-4" /> Prijavi oglas</button>
-                 </div>
-              </div>
-              )}
-
-              {similarLoading && <div className="mt-12 max-w-6xl mx-auto px-4"><div className="h-8 w-48 rounded-lg bg-[#131C2B] animate-pulse mb-4" /><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">{[1,2,3,4].map(i => <div key={i} className="rounded-[18px] overflow-hidden aspect-square bg-[#131C2B] animate-pulse" />)}</div></div>}
-              {!similarLoading && similarAds.length > 0 && (
-                <div className="mt-12 max-w-6xl mx-auto px-4">
-                  <h2 className="text-lg font-black uppercase tracking-wide mb-4" style={{ color: 'var(--text-primary)' }}>Slični oglasi</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
-                    {similarAds.map((similar) => (
-                      <AdCard key={similar.id} ad={similar} isFavorite={favorites.includes(similar.id)} onToggleFavorite={onToggleFavorite} imgWidth={400} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {reportOpen && createPortal(
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/70" onClick={() => !reportLoading && setReportOpen(false)}>
-                  <div className="rounded-2xl border p-6 w-full max-w-md shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-lg font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Prijavi oglas</h3>
-                    {reportSuccess ? <p className="text-sm mb-4" style={{ color: 'var(--accent)' }}>Prijava je zabilježena. Hvala.</p> : (
-                      <>
-                        {reportError && <p className="text-red-400 text-sm mb-2">{reportError}</p>}
-                        <input type="text" value={reportReason} onChange={(e) => setReportReason(e.target.value)} placeholder="Razlog prijave *" className="w-full h-12 rounded-xl px-4 border mb-3 outline-none text-sm" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-                        <textarea value={reportDetails} onChange={(e) => setReportDetails(e.target.value)} placeholder="Dodatne informacije (opciono)" rows={3} className="w-full rounded-xl px-4 py-3 border mb-4 outline-none text-sm resize-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-                        <div className="flex gap-3">
-                          <button type="button" onClick={() => setReportOpen(false)} disabled={reportLoading} className="flex-1 h-12 rounded-xl border font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
-                          <button type="button" onClick={handleReportSubmit} disabled={reportLoading} className="flex-1 h-12 rounded-xl font-black uppercase text-[10px] text-white" style={{ backgroundColor: 'var(--accent)' }}>{reportLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Pošalji'}</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>,
-                document.body
-              )}
-           </div>
-        </div>
-      </div>
-    </div>
+    <AdDetailView
+      ad={ad}
+      user={user}
+      onToggleFavorite={onToggleFavorite}
+      favorites={favorites}
+      ratings={ratings}
+      onAddRating={onAddRating}
+      getSellerMetrics={getSellerMetrics}
+      sellerAdsCount={sellerAdsCount}
+      similarAds={similarAds}
+      similarLoading={similarLoading}
+      navigate={navigate}
+      location={location}
+      API_BASE={API_BASE}
+      getAuthHeaders={getAuthHeaders}
+      setPageMeta={setPageMeta}
+      ownerActions={isOwner ? {
+        promoteError,
+        onPromoteClick: (planDays) => {
+          setPromoteError('');
+          if (!user) { navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); return; }
+          fetch(`${API_BASE}/payments/checkout`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ adId: ad.id, planDays }) })
+            .then((res) => res.json().then((data: { url?: string; error?: string }) => ({ status: res.status, data })))
+            .then(({ status, data }) => { if (status === 401) navigate(`/prijava?returnTo=${encodeURIComponent(location.pathname)}`); else if (data?.url) window.location.href = data.url; else if (data?.error) setPromoteError(data.error); });
+        },
+        onStatusChange: (status) => {
+          if (status === 'PRODAN' && !window.confirm('Označiti kao prodan? Oglas će biti trajno uklonjen.')) return;
+          fetch(`${API_BASE}/ads/my/${ad.id}`, status === 'PRODAN'
+            ? { method: 'DELETE', headers: getAuthHeaders() }
+            : { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status }) })
+            .then(res => {
+              if (res.ok && status === 'PRODAN') navigate('/moji-oglasi');
+              if (res.ok && status !== 'PRODAN') res.json().then((data: any) => setAdFromApi(mapApiAdToAd(data)));
+            });
+        },
+        onDelete: () => {
+          if (!window.confirm('Obrisati ovaj oglas?')) return;
+          fetch(`${API_BASE}/ads/my/${ad.id}`, { method: 'DELETE', headers: getAuthHeaders() })
+            .then(res => { if (res.ok) navigate('/moji-oglasi'); });
+        },
+      } : undefined}
+    />
   );
 };
 
