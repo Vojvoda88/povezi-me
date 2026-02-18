@@ -495,7 +495,7 @@ export const AdminPendingAds: React.FC = () => {
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button type="button" onClick={() => approve(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase flex-1" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Odobri</button>
                   <button type="button" onClick={() => reject(a.id)} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij</button>
-                  <a href={`/oglas/${a.slug}`} target="_blank" rel="noopener noreferrer" className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border flex items-center justify-center" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</a>
+                  <Link to={`/admin/oglas-preview/${a.slug}`} className="min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold uppercase border flex items-center justify-center" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
                 </div>
               </div>
             ))}
@@ -522,7 +522,7 @@ export const AdminPendingAds: React.FC = () => {
                   <td className="p-3 flex gap-2">
                     <button type="button" onClick={() => approve(a.id)} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Odobri</button>
                     <button type="button" onClick={() => reject(a.id)} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij</button>
-                    <a href={`/oglas/${a.slug}`} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</a>
+                    <Link to={`/admin/oglas-preview/${a.slug}`} className="px-3 py-1.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>Pogledaj</Link>
                   </td>
                 </tr>
               ))}
@@ -531,6 +531,68 @@ export const AdminPendingAds: React.FC = () => {
         </div>
         </>
       )}
+    </div>
+  );
+};
+
+// ----- Pregled oglasa (admin) – učitava preko admin API-ja, radi i za oglase na čekanju -----
+const AdminAdPreview: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const url = slug ? `${API_BASE}/admin/ads/by-slug/${encodeURIComponent(slug)}` : null;
+  const { data: ad, loading, error, refetch } = useAdminFetch<{
+    id: string; slug: string; naslov: string; opis: string; cijena: number; status: string; kategorija: string; lokacija?: string;
+    images: { url: string; thumbUrl?: string }[];
+    vlasnik: { id: string; ime: string; telefon: string | null };
+  }>(url);
+
+  const approve = () => {
+    if (!ad) return;
+    fetch(`${API_BASE}/admin/ads/${ad.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status: 'AKTIVAN' }) })
+      .then(res => res.ok && navigate('/admin/pending'));
+  };
+  const reject = () => {
+    if (!ad || !window.confirm('Odbij ovaj oglas? (Oglas će biti obrisan.)')) return;
+    fetch(`${API_BASE}/admin/ads/${ad.id}`, { method: 'DELETE', headers: getAuthHeaders() })
+      .then(res => res.ok && navigate('/admin/pending'));
+  };
+
+  if (loading && !ad) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} /></div>;
+  if (error || !ad) return (
+    <div className="py-8" style={{ color: 'var(--text-secondary)' }}>
+      {error || 'Oglas nije pronađen'}
+      <button type="button" onClick={() => refetch()} className="ml-2 underline">Pokušaj ponovo</button>
+      <Link to="/admin/pending" className="ml-2 underline">← Nazad na čekanju</Link>
+    </div>
+  );
+
+  const imgUrl = ad.images?.[0]?.url ?? ad.images?.[0]?.thumbUrl;
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="button" onClick={() => navigate('/admin/pending')} className="p-2 rounded-lg border" style={{ borderColor: 'var(--border-subtle)' }}><ChevronLeft className="w-5 h-5" /></button>
+        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest">Pregled oglasa</h1>
+        <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: ad.status === 'NA_CEKANJU' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)', color: 'var(--text-primary)' }}>{ad.status}</span>
+      </div>
+      <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+        {imgUrl && <div className="aspect-video bg-black/20"><img src={imgUrl} alt="" className="w-full h-full object-contain" /></div>}
+        <div className="p-6 space-y-4">
+          <h2 className="text-2xl font-black text-white">{ad.naslov}</h2>
+          <p className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{Number(ad.cijena)} €</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{ad.kategorija}{ad.lokacija ? ` · ${ad.lokacija}` : ''}</p>
+          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ad.opis || '—'}</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Prodavac: {ad.vlasnik?.ime}{ad.vlasnik?.telefon ? ` · ${ad.vlasnik.telefon}` : ''}</p>
+        </div>
+        <div className="p-6 border-t flex flex-wrap gap-3" style={{ borderColor: 'var(--border-subtle)' }}>
+          <Link to="/admin/pending" className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border" style={{ borderColor: 'var(--border-subtle)' }}>← Nazad na čekanju</Link>
+          {ad.status === 'NA_CEKANJU' && (
+            <>
+              <button type="button" onClick={approve} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase text-white" style={{ backgroundColor: 'var(--accent)' }}>Odobri oglas</button>
+              <button type="button" onClick={reject} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij (obriši)</button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -679,6 +741,7 @@ export const AdminRoutes: React.FC<{ user: User | null; onLogin: (u: User) => vo
     <Route path="/admin/users/:id" element={<AdminGuard user={user}><AdminLayout><AdminUserDetail /></AdminLayout></AdminGuard>} />
     <Route path="/admin/ads" element={<AdminGuard user={user}><AdminLayout><AdminAds /></AdminLayout></AdminGuard>} />
     <Route path="/admin/pending" element={<AdminGuard user={user}><AdminLayout><AdminPendingAds /></AdminLayout></AdminGuard>} />
+    <Route path="/admin/oglas-preview/:slug" element={<AdminGuard user={user}><AdminLayout><AdminAdPreview /></AdminLayout></AdminGuard>} />
     <Route path="/admin/reports" element={<AdminGuard user={user}><AdminLayout><AdminReports /></AdminLayout></AdminGuard>} />
     <Route path="/admin/payments" element={<AdminGuard user={user}><AdminLayout><AdminPayments /></AdminLayout></AdminGuard>} />
   </Routes>

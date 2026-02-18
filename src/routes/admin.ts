@@ -242,6 +242,28 @@ const adsQuerySchema = z.object({
   possibleDuplicates: z.enum(['true', 'false']).optional()
 });
 
+/** GET single ad by slug (any status) – samo admin, za pregled oglasa na čekanju */
+router.get('/ads/by-slug/:slug', authenticate as any, requireAdmin as any, (async (req: Request, res: Response) => {
+  const r = req as any;
+  const s = res as any;
+  const slug = r.params.slug;
+  if (!slug) return s.status(400).json({ error: 'Slug je obavezan' });
+  try {
+    const ad = await prisma.ad.findFirst({
+      where: { slug, deletedAt: null },
+      include: {
+        images: { orderBy: { order: 'asc' as const }, select: { url: true, thumbUrl: true, width: true, height: true, order: true } },
+        vlasnik: { select: { id: true, ime: true, telefon: true } },
+      },
+    });
+    if (!ad) return s.status(404).json({ error: 'Oglas nije pronađen' });
+    s.json({ ...ad, cijena: Number(ad.cijena) });
+  } catch (err) {
+    console.error('Admin ad by slug:', err);
+    s.status(500).json({ error: 'Greška pri preuzimanju oglasa' });
+  }
+}) as any);
+
 router.get('/ads', authenticate as any, requireAdmin as any, (async (req: Request, res: Response) => {
   const r = req as any;
   const s = res as any;
