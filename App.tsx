@@ -832,8 +832,9 @@ const Marketplace: React.FC<{
   const stabilizerTimeoutsRef = useRef<number[]>([]);
   /** Dev: detekcija VirtualList onScroll(0) odmah nakon restore-a (list reset) */
   const justRestoredListOffsetRef = useRef<number | null>(null);
-  // Pri mountu / nakon back: pročitaj spremljenu scroll SAMO kad se vraćaš sa detail-a
-  useEffect(() => {
+  // Pri mountu / nakon back: pročitaj spremljenu scroll SAMO kad se vraćaš sa detail-a.
+  // KRITIČNO: useLayoutEffect da se refs postave PRIJE restore useLayoutEffect-a.
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
     const hasFlag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1';
