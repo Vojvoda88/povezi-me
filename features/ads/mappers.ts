@@ -20,6 +20,9 @@ export const mapApiAdToAd = (raw: any): Ad => {
     kvadratura: typeof d.kvadratura === 'number' ? d.kvadratura : undefined,
     brojSoba: typeof d.brojSoba === 'string' ? d.brojSoba : undefined,
     sprat: typeof d.sprat === 'string' ? d.sprat : undefined,
+    amenities: Array.isArray(d.amenities) ? (d.amenities as string[]).filter((x): x is string => typeof x === 'string') : undefined,
+    floorplanUrl: typeof d.floorplanUrl === 'string' && d.floorplanUrl.trim() ? d.floorplanUrl.trim() : undefined,
+    virtualTourUrl: typeof d.virtualTourUrl === 'string' && d.virtualTourUrl.trim() ? d.virtualTourUrl.trim() : undefined,
   } : undefined;
 
   let featuredUntil: number | null = null;

@@ -22,7 +22,7 @@ import {
   LogOut, Send, ArrowLeft, Bell, AlertTriangle, Zap, XCircle, Loader2, Rocket, Heart,
   ChevronRight as ChevronRightIcon, StarHalf, MessageCircle, SlidersHorizontal, Camera,
   Instagram, Facebook, Trash, Settings2, Info, Calendar, UserCheck, ChevronRight, Share2, Award, SearchX,
-  Plus, ChevronDown, Check, Upload, Sun, Moon
+  Plus, ChevronDown, Check, Upload, Sun, Moon, BookmarkPlus
 } from 'lucide-react';
 
 import {
@@ -34,7 +34,7 @@ import {
   DEMO_ADS as INITIAL_ADS, CATEGORIES,
   LOCATIONS, INITIAL_NOTIFICATIONS, MOTO_CATALOG, VEHICLE_FIELDS_CONFIG, STANJE_OPTIONS,
   TIP_OGLASA_OPTIONS, TIP_OGLASA_USLUGE, NEKRETNINE_TIP_PONUDE, NEKRETNINE_BROJ_SOBA,
-  NEKRETNINE_TIP, NEKRETNINE_SPRAT, NEKRETNINE_TIP_FIELDS,
+  NEKRETNINE_TIP, NEKRETNINE_SPRAT, NEKRETNINE_TIP_FIELDS, NEKRETNINE_AMENITIES,
   MOTORNA_VOZILA_ID, MOTORNA_VOZILA_SUBCATEGORIES
 } from './constants';
 import { AUTOMOTIVE_CATALOG } from './automotiveCatalog';
@@ -118,6 +118,7 @@ const DEFAULT_FILTERS = {
   kvadraturaMin: '',
   broj_soba: '',
   sprat: '',
+  amenities: '',
   klasaNosivosti: '',
   nosivostKg: '',
   brojOsovina: '',
@@ -419,6 +420,7 @@ const AppContent: React.FC = () => {
       '/registracija': 'Registracija - Poveži.ME',
       '/moji-oglasi': 'Moji oglasi - Poveži.ME',
       '/moji-favoriti': 'Sačuvano - Poveži.ME',
+      '/moje-spremljene-pretrage': 'Spremljene pretrage - Poveži.ME',
       '/objavi': 'Objavi oglas - Poveži.ME',
       '/poruke': 'Poruke - Poveži.ME',
       '/obavjestenja': 'Obavještenja - Poveži.ME',
@@ -594,7 +596,7 @@ const AppContent: React.FC = () => {
             <Route path="/moji-oglasi" element={<RequireAuth><MyAds user={currentUser} onRefresh={refreshAds} /></RequireAuth>} />
             <Route path="/moji-oglasi/uredi/:id" element={<RequireAuth><EditAd user={currentUser} onSaved={refreshAds} /></RequireAuth>} />
             <Route path="/moji-favoriti" element={<RequireAuth><MyFavorites ads={ads} favorites={favorites} onToggleFavorite={toggleFavorite} adsError={adsError} adsAreFallback={adsAreFallback} onRetryAds={refreshAds} /></RequireAuth>} />
-            <Route path="/moje-spremljene-pretrage" element={<Navigate to="/marketplace" replace />} />
+            <Route path="/moje-spremljene-pretrage" element={<RequireAuth><MySavedSearches /></RequireAuth>} />
             <Route path="/objavi" element={<RequireAuth><AddAd user={currentUser} onAddAd={prependAd} onPublishSuccess={refreshAds} /></RequireAuth>} />
             <Route path="/poruke" element={SHOW_CHAT ? <RequireAuth><Chat user={currentUser} ads={ads} conversations={conversations} setConversations={setConversations} messages={messages} setMessages={setMessages} setNotifications={setNotifications} onRefreshNotifications={fetchNotifications} onMarkMessageNotificationsRead={markMessageNotificationsReadForConversation} /></RequireAuth> : <Navigate to="/marketplace" replace />} />
             <Route path="/pravila" element={<LegalPage title="Pravila korištenja" content={PRAVILA_CONTENT} />} />
@@ -731,6 +733,7 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
                   <MenuLink to="/objavi" icon={<PlusCircle className="w-4 h-4" />} label="Objavi oglas" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-oglasi" icon={<LayoutDashboard className="w-4 h-4" />} label="Moji Oglasi" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/moji-favoriti" icon={<Heart className="w-4 h-4" />} label="Sačuvano" onClick={() => setMenuOpen(false)} />
+                  <MenuLink to="/moje-spremljene-pretrage" icon={<BookmarkPlus className="w-4 h-4" />} label="Spremljene pretrage" onClick={() => setMenuOpen(false)} />
                   <MenuLink to="/obavjestenja" icon={<Bell className="w-4 h-4" />} label="Obavještenja" onClick={() => setMenuOpen(false)} />
                   {SHOW_CHAT && <MenuLink to="/poruke" icon={<MessageSquare className="w-4 h-4" />} label="Poruke" onClick={() => setMenuOpen(false)} />}
                   <div className="h-px bg-slate-700 my-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
@@ -820,6 +823,10 @@ const Marketplace: React.FC<{
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showFiltersOpen, setShowFiltersOpen] = useState(false);
   const [isNarrowScreen, setIsNarrowScreen] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+  const [saveSearchModalOpen, setSaveSearchModalOpen] = useState(false);
+  const [saveSearchNaziv, setSaveSearchNaziv] = useState('');
+  const [saveSearchLoading, setSaveSearchLoading] = useState(false);
+  const [saveSearchError, setSaveSearchError] = useState('');
   const searchQuery = searchParams.get('q') || "";
   const pendingScrollYRef = useRef<number | null>(null);
   /** Scroll offset unutar VirtualList-a (samo kad je lista virtualizirana). */
@@ -1111,6 +1118,21 @@ const Marketplace: React.FC<{
     return common;
   }, [isMotornaVozila, effectiveVehicleSubcategory, filters]);
 
+  const hasActiveSearch = useMemo(() => {
+    if (searchQuery.trim()) return true;
+    return Object.entries(filters).some(([, v]) => v != null && String(v).trim() !== '');
+  }, [searchQuery, filters]);
+
+  const buildQueryForSave = useCallback(() => {
+    const q: Record<string, string> = {};
+    searchParams.forEach((v, k) => q[k] = v);
+    if (categorySlug) {
+      q.category = categorySlug;
+      q.kategorija = activeCategory?.id ?? categorySlug;
+    }
+    return q;
+  }, [searchParams, categorySlug, activeCategory?.id]);
+
   useEffect(() => {
     setFilters(filtersFromURL);
   }, [filtersFromURL]);
@@ -1202,6 +1224,17 @@ const Marketplace: React.FC<{
       if (filters.kvadraturaMin) result = result.filter(ad => ((ad as any).realEstateDetails?.kvadratura || 0) >= Number(filters.kvadraturaMin));
       if (filters.broj_soba) result = result.filter(ad => (ad as any).realEstateDetails?.brojSoba === filters.broj_soba);
       if (filters.sprat) result = result.filter(ad => (ad as any).realEstateDetails?.sprat === filters.sprat);
+      if (filters.amenities) {
+        const wanted = (filters.amenities || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (wanted.length > 0) {
+          result = result.filter(ad => {
+            const adAmenities = (ad as any).realEstateDetails?.amenities;
+            if (!Array.isArray(adAmenities)) return false;
+            const set = new Set(adAmenities);
+            return wanted.every((w: string) => set.has(w));
+          });
+        }
+      }
     }
 
     if (activeCategory?.id === 'auto_dijelovi' && filters.stanje) {
@@ -1413,11 +1446,11 @@ const Marketplace: React.FC<{
       {/* Na mobilnom: dugme "Filteri" otvara/zatvara panel; na desktopu filteri uvijek vidljivi. Sortiraj je u istoj liniji kao Tip, Lokacija, Cijena. */}
       <div className="px-4">
         <div className="flex flex-wrap items-center gap-2 pb-3">
-          <div className="lg:hidden flex-shrink-0">
+          <div className="lg:hidden flex flex-wrap items-center gap-2 flex-1 min-w-0">
             <button
               type="button"
               onClick={() => setShowFiltersOpen(!showFiltersOpen)}
-              className="flex items-center gap-2.5 h-12 px-5 rounded-xl font-bold uppercase text-[10px] tracking-wide border transition-all shadow-sm"
+              className="flex items-center gap-2.5 h-12 px-5 rounded-xl font-bold uppercase text-[10px] tracking-wide border transition-all shadow-sm flex-shrink-0"
               style={{
                 backgroundColor: showFiltersOpen ? 'var(--bg-input)' : 'var(--bg-card)',
                 borderColor: showFiltersOpen ? 'var(--accent)' : 'var(--border-subtle)',
@@ -1432,6 +1465,11 @@ const Marketplace: React.FC<{
               )}
               <ChevronDown className={`w-4 h-4 transition-transform ${showFiltersOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-secondary)' }} />
             </button>
+            {user && hasActiveSearch && (
+              <button type="button" onClick={() => { setSaveSearchError(''); setSaveSearchNaziv(''); setSaveSearchModalOpen(true); }} className="flex items-center gap-2 h-12 px-4 rounded-xl font-bold uppercase text-[10px] tracking-wide border flex-shrink-0" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                <BookmarkPlus className="w-4 h-4" /> Spremi
+              </button>
+            )}
           </div>
         </div>
         <div className={`rounded-xl border overflow-hidden transition-all overflow-y-auto ${showFiltersOpen ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0'} lg:max-h-none lg:opacity-100`} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -1475,6 +1513,14 @@ const Marketplace: React.FC<{
                   ))}
                 </select>
               </div>
+              {user && hasActiveSearch && (
+                <div className="hidden lg:flex flex-col gap-2 flex-shrink-0">
+                  <span className="text-[10px] font-bold uppercase tracking-wide opacity-0">.</span>
+                  <button type="button" onClick={() => { setSaveSearchError(''); setSaveSearchNaziv(''); setSaveSearchModalOpen(true); }} className="h-11 px-4 rounded-xl text-sm font-bold uppercase border flex items-center gap-2 whitespace-nowrap" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                    <BookmarkPlus className="w-4 h-4" /> Spremi pretragu
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="p-4 lg:p-5 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row lg:flex-wrap gap-4 lg:gap-6 lg:items-end">
@@ -1568,11 +1614,50 @@ const Marketplace: React.FC<{
                   {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
               </div>
-              <button type="button" onClick={handleResetFilters} className="h-11 flex items-center text-[10px] font-bold uppercase tracking-wide lg:ml-auto rounded-xl px-4 border transition-colors" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Poništi filtere</button>
+              <div className="flex items-center gap-2 lg:ml-auto">
+                {user && hasActiveSearch && (
+                  <button type="button" onClick={() => { setSaveSearchError(''); setSaveSearchNaziv(''); setSaveSearchModalOpen(true); }} className="hidden lg:flex h-11 items-center gap-2 text-[10px] font-bold uppercase tracking-wide rounded-xl px-4 border transition-colors" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                    <BookmarkPlus className="w-4 h-4" /> Spremi pretragu
+                  </button>
+                )}
+                <button type="button" onClick={handleResetFilters} className="h-11 flex items-center text-[10px] font-bold uppercase tracking-wide rounded-xl px-4 border transition-colors" style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}>Poništi filtere</button>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {saveSearchModalOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 pt-8 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 bg-black/60" onClick={() => !saveSearchLoading && setSaveSearchModalOpen(false)}>
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto p-6 rounded-2xl border shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black uppercase text-white mb-2">Spremi pretragu</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Naziv je opcionalan. Obavijestićemo vas kad se pojavi novi oglas koji odgovara.</p>
+            <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. Stanovi Podgorica do 500€" className="w-full h-14 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-white placeholder-[#6B7280] mb-4 text-base" />
+            {saveSearchError && <p className="text-red-400 text-sm mb-4">{saveSearchError}</p>}
+            <div className="flex gap-3">
+              <button type="button" disabled={saveSearchLoading} onClick={() => setSaveSearchModalOpen(false)} className="flex-1 min-h-[44px] rounded-xl border font-bold uppercase text-sm" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
+              <button type="button" disabled={saveSearchLoading} onClick={async () => {
+                setSaveSearchError('');
+                setSaveSearchLoading(true);
+                try {
+                  const res = await fetch(`${API_BASE}/saved-searches`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                    body: JSON.stringify({ naziv: saveSearchNaziv.trim() || null, query: buildQueryForSave() }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) { setSaveSearchError(data?.error || 'Greška pri spremanju.'); return; }
+                  setSaveSearchModalOpen(false);
+                  setSaveSearchNaziv('');
+                  navigate('/moje-spremljene-pretrage');
+                } catch { setSaveSearchError('Greška u mreži.'); } finally { setSaveSearchLoading(false); }
+              }} className="flex-1 min-h-[44px] rounded-xl font-bold uppercase text-sm flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
+                {saveSearchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Spremi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {filtered.length > 0 ? (
         <>
@@ -1966,6 +2051,23 @@ const FilterPanel: React.FC<{ category: string, initialFilters: any, onApply: (f
                 </select>
               </div>
             )}
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Sadržaji</label>
+              <div className="flex flex-wrap gap-2">
+                {NEKRETNINE_AMENITIES.map(a => {
+                  const selected = (localFilters.amenities || '').split(',').map((s: string) => s.trim()).includes(a.id);
+                  return (
+                    <button key={a.id} type="button" onClick={() => {
+                      const arr = (localFilters.amenities || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                      const next = selected ? arr.filter((x: string) => x !== a.id) : [...arr, a.id];
+                      setLocalFilters({...localFilters, amenities: next.join(',')});
+                    }} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selected ? 'border-[var(--accent)] bg-[var(--accent)]/20' : ''}`} style={selected ? { color: 'var(--accent)' } : { borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                      {a.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </>
         )}
         {/* DINAMIČKA POLJA (vozila i ostalo) */}
@@ -2113,12 +2215,23 @@ const AdCardInner: React.FC<{
       <div className="p-3 flex flex-col flex-grow">
         <LinkOrSpan to={linkTo} className="font-medium text-sm line-clamp-2 leading-tight mb-2 h-9 block" style={{ color: 'var(--text-primary)' }}>{ad.naslov}</LinkOrSpan>
         {ad.kategorija === 'nekretnine' && ad.realEstateDetails && (
-          <p className="text-[10px] font-bold uppercase tracking-wide mb-1 flex flex-wrap gap-x-2 gap-y-0" style={{ color: 'var(--text-secondary)' }}>
-            {ad.realEstateDetails.tipNekretnine && <span>{NEKRETNINE_TIP.find(t => t.id === ad.realEstateDetails!.tipNekretnine)?.name || ad.realEstateDetails.tipNekretnine}</span>}
-            {ad.realEstateDetails.kvadratura != null && <span>{ad.realEstateDetails.kvadratura} m²</span>}
-            {ad.realEstateDetails.brojSoba && <span>{ad.realEstateDetails.brojSoba} sobe</span>}
-            {ad.realEstateDetails.sprat && <span>Sprat {NEKRETNINE_SPRAT.find(s => s.id === ad.realEstateDetails!.sprat)?.name || ad.realEstateDetails.sprat}</span>}
-          </p>
+          <>
+            <p className="text-[10px] font-bold uppercase tracking-wide mb-1 flex flex-wrap gap-x-2 gap-y-0" style={{ color: 'var(--text-secondary)' }}>
+              {ad.realEstateDetails.tipNekretnine && <span>{NEKRETNINE_TIP.find(t => t.id === ad.realEstateDetails!.tipNekretnine)?.name || ad.realEstateDetails.tipNekretnine}</span>}
+              {ad.realEstateDetails.kvadratura != null && <span>{ad.realEstateDetails.kvadratura} m²</span>}
+              {ad.realEstateDetails.brojSoba && <span>{ad.realEstateDetails.brojSoba} sobe</span>}
+              {ad.realEstateDetails.sprat && <span>Sprat {NEKRETNINE_SPRAT.find(s => s.id === ad.realEstateDetails!.sprat)?.name || ad.realEstateDetails.sprat}</span>}
+            </p>
+            {Array.isArray(ad.realEstateDetails.amenities) && ad.realEstateDetails.amenities.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1">
+                {ad.realEstateDetails.amenities.slice(0, 4).map(aid => {
+                  const a = NEKRETNINE_AMENITIES.find(x => x.id === aid);
+                  return a ? <span key={aid} className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-white/10 text-[#9CA3AF]">{a.name}</span> : null;
+                })}
+                {ad.realEstateDetails.amenities.length > 4 && <span className="text-[9px] text-[#9CA3AF]">+{ad.realEstateDetails.amenities.length - 4}</span>}
+              </div>
+            )}
+          </>
         )}
         <p className="text-[18px] font-semibold mb-2" style={{ color: 'var(--accent)' }}>{ad.cijena.toLocaleString()} €</p>
         <div className="mt-auto flex justify-between items-center border-t pt-2" style={{ borderColor: 'var(--border-subtle)' }}>
@@ -2339,6 +2452,30 @@ export const AdDetailView: React.FC<{
                {ad.realEstateDetails.brojSoba && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Broj soba</span><span className="text-white font-bold">{ad.realEstateDetails.brojSoba}</span></div>}
                {ad.realEstateDetails.sprat != null && <div className="p-3 rounded-xl border bg-white/5 border-white/5"><span className="text-[9px] font-black uppercase text-[#9CA3AF] block mb-1">Sprat</span><span className="text-white font-bold">{NEKRETNINE_SPRAT.find(s => s.id === ad.realEstateDetails!.sprat)?.name ?? ad.realEstateDetails.sprat}</span></div>}
              </div>
+             {Array.isArray(ad.realEstateDetails.amenities) && ad.realEstateDetails.amenities.length > 0 && (
+               <div className="flex flex-wrap gap-2">
+                 {ad.realEstateDetails.amenities.map(aid => {
+                   const a = NEKRETNINE_AMENITIES.find(x => x.id === aid);
+                   return a ? <span key={aid} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#4F6DFF]/20 text-[#7C8CFF] border border-[#4F6DFF]/30">{a.name}</span> : null;
+                 })}
+               </div>
+             )}
+             {(ad.realEstateDetails.floorplanUrl && String(ad.realEstateDetails.floorplanUrl).trim()) && (
+               <div className="pt-2">
+                 <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Tlocrt</h4>
+                 <a href={ad.realEstateDetails.floorplanUrl} target="_blank" rel="noopener noreferrer" className="block rounded-2xl overflow-hidden border border-white/10 hover:border-[#4F6DFF]/50 transition-all">
+                   <img src={ad.realEstateDetails.floorplanUrl} alt="Tlocrt" className="w-full max-h-80 object-contain bg-[#0B1220]" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                 </a>
+               </div>
+             )}
+             {(ad.realEstateDetails.virtualTourUrl && String(ad.realEstateDetails.virtualTourUrl).trim()) && (
+               <div className="pt-2">
+                 <h4 className="text-[9px] font-black uppercase tracking-widest text-[#9CA3AF] mb-2">Virtualna tura</h4>
+                 <a href={ad.realEstateDetails.virtualTourUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#4F6DFF]/20 text-[#7C8CFF] border border-[#4F6DFF]/30 font-bold text-sm hover:bg-[#4F6DFF]/30 transition-all">
+                   Otvori 360° / Matterport turu →
+                 </a>
+               </div>
+             )}
           </div>
           ) : (ad.carDetails || ad.motorcycleDetails || (ad.details && typeof ad.details === 'object')) ? (
           <div className="space-y-4 pt-4 border-t border-white/5">
@@ -3418,12 +3555,17 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       setSubmitError('Odaberite tip vozila (npr. Automobili, Motocikli...).'); return;
     }
 
-    const realEstateDetails = category === 'nekretnine' && (formData.realEstateDetails?.tipNekretnine || formData.realEstateDetails?.kvadratura || formData.realEstateDetails?.tipPonude) ? {
-      tipNekretnine: formData.realEstateDetails.tipNekretnine || undefined,
-      tipPonude: (formData.realEstateDetails.tipPonude || 'prodaja') as 'prodaja' | 'izdavanje',
-      kvadratura: formData.realEstateDetails.kvadratura ? Number(formData.realEstateDetails.kvadratura) : undefined,
-      brojSoba: formData.realEstateDetails.brojSoba || undefined,
-      sprat: formData.realEstateDetails.sprat || undefined,
+    const red = formData.realEstateDetails;
+    const hasNekretninaData = red?.tipNekretnine || red?.kvadratura || red?.tipPonude || (Array.isArray(red?.amenities) && red.amenities.length > 0) || (red?.floorplanUrl && String(red.floorplanUrl).trim()) || (red?.virtualTourUrl && String(red.virtualTourUrl).trim());
+    const realEstateDetails = category === 'nekretnine' && hasNekretninaData ? {
+      tipNekretnine: red?.tipNekretnine || undefined,
+      tipPonude: (red?.tipPonude || 'prodaja') as 'prodaja' | 'izdavanje',
+      kvadratura: red?.kvadratura ? Number(red.kvadratura) : undefined,
+      brojSoba: red?.brojSoba || undefined,
+      sprat: red?.sprat || undefined,
+      amenities: Array.isArray(red?.amenities) && red.amenities.length > 0 ? red.amenities : undefined,
+      floorplanUrl: (red?.floorplanUrl && String(red.floorplanUrl).trim()) || undefined,
+      virtualTourUrl: (red?.virtualTourUrl && String(red.virtualTourUrl).trim()) || undefined,
     } : undefined;
     const baseDetails = category === 'auto_dijelovi' ? { stanje: formData.details?.stanje || 'Polovno' } : (realEstateDetails as Record<string, unknown> | undefined);
     const contactDetails: Record<string, unknown> = { ...(baseDetails || {}) };
@@ -3714,6 +3856,31 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
                   </select>
                 </div>
               )}
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Sadržaji (opciono)</label>
+                <div className="flex flex-wrap gap-2">
+                  {NEKRETNINE_AMENITIES.map(a => {
+                    const arr = Array.isArray(formData.realEstateDetails?.amenities) ? formData.realEstateDetails.amenities : [];
+                    const selected = arr.includes(a.id);
+                    return (
+                      <button key={a.id} type="button" onClick={() => {
+                        const next = selected ? arr.filter((x: string) => x !== a.id) : [...arr, a.id];
+                        setFormData({...formData, realEstateDetails: {...formData.realEstateDetails, amenities: next}});
+                      }} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selected ? 'border-[var(--accent)] bg-[var(--accent)]/20' : ''}`} style={selected ? { color: 'var(--accent)' } : { borderColor: 'rgba(255,255,255,0.2)', color: '#9CA3AF' }}>
+                        {a.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL tlocrtа (opciono)</label>
+                <input type="url" value={formData.realEstateDetails?.floorplanUrl || ''} onChange={e => setFormData({...formData, realEstateDetails: {...formData.realEstateDetails, floorplanUrl: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" placeholder="https://..." />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Virtualna tura – URL (Matterport, 360°, opciono)</label>
+                <input type="url" value={formData.realEstateDetails?.virtualTourUrl || ''} onChange={e => setFormData({...formData, realEstateDetails: {...formData.realEstateDetails, virtualTourUrl: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" placeholder="https://my.matterport.com/..." />
+              </div>
             </div>
           </section>
         )}
@@ -3974,6 +4141,26 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
               <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip ponude</label><select value={formData.realEstateDetails?.tipPonude || 'prodaja'} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, tipPonude: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{NEKRETNINE_TIP_PONUDE.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}</select></div>
               <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Kvadratura (m²)</label><input type="number" min={0} step="any" value={formData.realEstateDetails?.kvadratura || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, kvadratura: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" /></div>
             </div>
+            <div>
+              <label className="text-[10px] font-black uppercase text-[#9CA3AF] block mb-2">Sadržaji (amenities)</label>
+              <div className="flex flex-wrap gap-2">
+                {NEKRETNINE_AMENITIES.map(a => {
+                  const arr = Array.isArray(formData.realEstateDetails?.amenities) ? formData.realEstateDetails.amenities : [];
+                  const checked = arr.includes(a.id);
+                  return (
+                    <label key={a.id} className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border cursor-pointer ${checked ? 'border-[#4F6DFF] bg-[#4F6DFF]/20 text-white' : 'border-white/10 bg-[#0B1220] text-[#9CA3AF]'}`}>
+                      <input type="checkbox" checked={checked} onChange={() => {
+                        const next = checked ? arr.filter((x: string) => x !== a.id) : [...arr, a.id];
+                        setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, amenities: next } });
+                      }} className="sr-only" />
+                      <span className="text-xs font-bold">{a.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL tlocrtа</label><input type="url" value={formData.realEstateDetails?.floorplanUrl || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, floorplanUrl: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="https://..." /></div>
+            <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL virtualne ture (Matterport, 360°)</label><input type="url" value={formData.realEstateDetails?.virtualTourUrl || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, virtualTourUrl: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="https://my.matterport.com/..." /></div>
           </section>
         )}
         <button type="submit" disabled={submitLoading} className="w-full h-14 bg-[#4F6DFF] text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-70 flex items-center justify-center gap-2">
@@ -4088,6 +4275,92 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
                   <option value="PRODAN">Prodano</option>
                   <option value="ISTEKAO">Istekao</option>
                 </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+type SavedSearchItem = { id: string; naziv: string | null; query: Record<string, string>; createdAt: string };
+
+const MySavedSearches: React.FC = () => {
+  const navigate = useNavigate();
+  const [list, setList] = useState<SavedSearchItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const fetchList = useCallback(() => {
+    fetch(`${API_BASE}/saved-searches`, { headers: getAuthHeaders() })
+      .then(res => res.ok ? res.json() : [])
+      .then((data: SavedSearchItem[]) => setList(Array.isArray(data) ? data : []))
+      .catch(() => setList([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchList();
+  }, [fetchList]);
+
+  const applySearch = (item: SavedSearchItem) => {
+    const q = item.query || {};
+    const category = q.category || q.kategorija || '';
+    const rest = { ...q };
+    delete rest.category;
+    delete rest.kategorija;
+    const params = new URLSearchParams();
+    Object.entries(rest).forEach(([k, v]) => { if (v != null && String(v).trim()) params.set(k, String(v)); });
+    const path = category ? `/kategorija/${category}` : '/marketplace';
+    const search = params.toString();
+    navigate(search ? `${path}?${search}` : path);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!window.confirm('Obrisati ovu spremljenu pretragu?')) return;
+    setDeletingId(id);
+    fetch(`${API_BASE}/saved-searches/${id}`, { method: 'DELETE', headers: getAuthHeaders() })
+      .then(res => { if (res.ok) setList(prev => prev.filter(x => x.id !== id)); })
+      .finally(() => setDeletingId(null));
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-12">
+        <h1 className="text-2xl font-black text-white uppercase mb-8 tracking-widest">Moje spremljene pretrage</h1>
+        <div className="space-y-3"><div className="h-16 bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-16 bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-16 bg-[#131C2B] rounded-xl animate-pulse" /></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <h1 className="text-xl sm:text-2xl font-black text-white uppercase tracking-widest">Spremljene pretrage</h1>
+        <Link to="/marketplace" className="text-[10px] font-bold uppercase text-[#4F6DFF] self-start sm:self-auto">← Nazad na pretragu</Link>
+      </div>
+      {list.length === 0 ? (
+        <div className="p-6 sm:p-8 rounded-2xl border text-center" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+          <BookmarkPlus className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-secondary)' }} />
+          <p className="font-bold text-white mb-2">Nema spremljenih pretraga</p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Na stranici za pretragu postavite filtere i kliknite „Spremi“ da dobijate obavijesti za nove oglase.</p>
+          <Link to="/marketplace" className="inline-flex items-center gap-2 min-h-[44px] px-5 py-3 rounded-xl font-bold text-sm" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Idi na pretragu →</Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {list.map(item => (
+            <div key={item.id} className="p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+              <button type="button" onClick={() => applySearch(item)} className="flex-1 min-w-0 text-left">
+                <p className="font-bold text-white truncate">{item.naziv || 'Pretraga bez naziva'}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>{new Date(item.createdAt).toLocaleDateString('sr-Latn-ME')}</p>
+              </button>
+              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-auto">
+                <button type="button" onClick={() => applySearch(item)} className="min-h-[44px] min-w-[44px] px-4 py-2 rounded-xl text-sm font-bold flex items-center justify-center" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Otvori</button>
+                <button type="button" onClick={() => handleDelete(item.id)} disabled={deletingId === item.id} className="min-h-[44px] min-w-[44px] p-2 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-500/10 disabled:opacity-50">
+                  {deletingId === item.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                </button>
               </div>
             </div>
           ))}

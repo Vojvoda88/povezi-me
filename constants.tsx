@@ -87,6 +87,21 @@ export const NEKRETNINE_TIP_FIELDS: Record<string, { brojSoba: boolean; sprat: b
   ostalo: { brojSoba: false, sprat: false },
 };
 
+/** Amenities za nekretnine – filter i prikaz. */
+export const NEKRETNINE_AMENITIES = [
+  { id: 'klima', name: 'Klima' },
+  { id: 'bazen', name: 'Bazen' },
+  { id: 'parking', name: 'Parking' },
+  { id: 'garaza', name: 'Garaža' },
+  { id: 'terasa', name: 'Terasa' },
+  { id: 'balkon', name: 'Balkon' },
+  { id: 'vrt', name: 'Vrt' },
+  { id: 'lift', name: 'Lift' },
+  { id: 'centralno_grijanje', name: 'Centralno grijanje' },
+  { id: 'pet_friendly', name: 'Pet-friendly' },
+  { id: 'wifi', name: 'WiFi' },
+];
+
 export const LOCATIONS = [
   'Podgorica', 'Budva', 'Kotor', 'Tivat', 'Nikšić', 'Bar', 'Herceg Novi', 'Bijelo Polje', 'Cetinje', 'Ulcinj', 'Pljevlja'
 ];

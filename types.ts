@@ -85,6 +85,9 @@ export interface RealEstateDetails {
   kvadratura?: number;
   brojSoba?: string;
   sprat?: string;
+  amenities?: string[]; // klima, bazen, parking, terasa, lift, ...
+  floorplanUrl?: string;
+  virtualTourUrl?: string;
 }
 
 export interface Ad {
