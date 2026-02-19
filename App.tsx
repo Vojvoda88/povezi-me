@@ -9,6 +9,7 @@ import {
   getListRouteKey,
   saveScrollForList,
   loadScrollForList,
+  loadAndClearScrollForList,
   clearListScroll,
   RETURN_TO_MARKETPLACE_KEY,
   SCROLL_TO_AD_SLUG_KEY,
