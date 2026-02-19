@@ -50,7 +50,7 @@ export function hardScrollToTop(): void {
     if (document.scrollingElement) (document.scrollingElement as HTMLElement).scrollTop = 0;
     if (document.documentElement) document.documentElement.scrollTop = 0;
     if (document.body) document.body.scrollTop = 0;
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   } catch (_) {}
 }
 
@@ -81,6 +81,7 @@ export function restoreScroll(y: number): void {
 export const setScrollTop = restoreScroll;
 
 const SCROLL_LIST_PREFIX = 'scroll:list:';
+export const RETURN_TO_MARKETPLACE_KEY = 'returnTo:marketplace';
 
 /**
  * Generiše listRouteKey: pathname + search (npr. /marketplace?q=auto ili /admin/pending).

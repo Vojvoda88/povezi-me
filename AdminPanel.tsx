@@ -585,14 +585,12 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, 
   const location = useLocation();
   const url = slug ? `${API_BASE}/admin/ads/by-slug/${encodeURIComponent(slug)}` : null;
 
-  // Detail route (admin preview): hard reset na vrh - odmah pri ulasku, 2x rAF
+  // Detail route (admin preview): SYNC reset na vrh PRIJE prvog paint-a (bez RAF)
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!slug) return;
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     hardScrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
-    return () => cancelAnimationFrame(raf);
   }, [slug, location.pathname, location.key]);
   const { data: rawAd, loading, error, refetch } = useAdminFetch<any>(url);
 
@@ -607,12 +605,10 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, 
       .then(res => res.ok && navigate('/admin/pending'));
   };
 
-  // Hard reset i nakon što ad učita
-  useEffect(() => {
+  // SYNC reset kad ad učita (layout se pomaknuo) – useLayoutEffect, bez RAF
+  useLayoutEffect(() => {
     if (!rawAd?.id) return;
     hardScrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
-    return () => cancelAnimationFrame(raf);
   }, [rawAd?.id]);
 
   if (loading && !rawAd) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} /></div>;

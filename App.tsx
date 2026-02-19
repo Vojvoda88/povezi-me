@@ -10,6 +10,7 @@ import {
   saveScrollForList,
   loadScrollForList,
   clearListScroll,
+  RETURN_TO_MARKETPLACE_KEY,
   isDetailRoute,
 } from './lib/scroll';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
@@ -821,10 +822,11 @@ const Marketplace: React.FC<{
   const virtualListScrollRef = useRef(0);
 
   const listKeyRef = useRef<string>('');
-  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice) - NE BRIŠI još
+  // Pri mountu: pročitaj spremljenu scroll poziciju SAMO kad se vraćaš sa detail-a
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
+    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) !== '1') return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       listKeyRef.current = listKey;
@@ -850,40 +852,50 @@ const Marketplace: React.FC<{
     let windowRestored = false;
     let listRestored = false;
 
-    const applyWindow = () => {
+    const applyWindow = (): boolean => {
       try {
-        if (pendingScrollYRef.current == null || windowRestored) return;
+        if (pendingScrollYRef.current == null || windowRestored) return windowRestored;
         const savedY = pendingScrollYRef.current;
         const scrollEl = getScrollRoot();
         const maxScroll = scrollEl && scrollEl !== window
           ? (scrollEl as HTMLElement).scrollHeight - (scrollEl as HTMLElement).clientHeight
           : document.documentElement.scrollHeight - window.innerHeight;
-        if (maxScroll > 0) {
-          const y = Math.min(savedY, Math.max(0, maxScroll));
-          restoreScroll(y);
+        if (maxScroll <= 0) return false;
+        const y = Math.min(savedY, Math.max(0, maxScroll));
+        restoreScroll(y);
+        const currentTop = scrollEl && scrollEl !== window
+          ? (scrollEl as HTMLElement).scrollTop
+          : (typeof window !== 'undefined' ? window.scrollY : 0);
+        if (Math.abs(currentTop - y) <= 2) {
           windowRestored = true;
           pendingScrollYRef.current = null;
+          return true;
         }
       } catch (_) {}
+      return false;
     };
 
-    const applyList = () => {
+    const applyList = (): boolean => {
       try {
-        if (pendingListScrollRef.current == null || listRestored) return;
+        if (pendingListScrollRef.current == null || listRestored) return listRestored;
         const list = virtualListRef.current;
-        if (!list || typeof list.scrollTo !== 'function') return;
+        if (!list || typeof list.scrollTo !== 'function') return false;
         const offset = Math.max(0, pendingListScrollRef.current);
         list.scrollTo(offset);
         listRestored = true;
         pendingListScrollRef.current = null;
+        return true;
       } catch (_) {}
+      return false;
     };
 
     const run = () => {
-      applyWindow();
-      applyList();
+      const okW = applyWindow();
+      const okL = applyList();
       const key = listKeyRef.current;
-      if (pendingScrollYRef.current == null && pendingListScrollRef.current == null && key) {
+      const bothDone = pendingScrollYRef.current == null && pendingListScrollRef.current == null;
+      if (bothDone && key && (okW || okL)) {
+        try { sessionStorage.removeItem(RETURN_TO_MARKETPLACE_KEY); } catch {}
         clearListScroll(key);
         listKeyRef.current = '';
       }
@@ -1146,6 +1158,7 @@ const Marketplace: React.FC<{
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       saveScrollForList(listKey, Math.round(virtualListScrollRef.current));
+      sessionStorage.setItem(RETURN_TO_MARKETPLACE_KEY, '1');
     } catch (_) {}
   }, [location.pathname, location.search]);
 
@@ -2351,14 +2364,12 @@ const AdDetail: React.FC<{
   const location = useLocation();
   const [adFromApi, setAdFromApi] = useState<Ad | null | undefined>(undefined);
 
-  // Detail route: hard reset na vrh - odmah pri ulasku, 2x rAF, i ponovo kad ad učita
+  // Detail route: SYNC reset na vrh PRIJE prvog paint-a (bez RAF/timeout – inače vidiš skok)
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!slug) return;
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     hardScrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
-    return () => cancelAnimationFrame(raf);
   }, [slug, location.pathname, location.key]);
   const [fetchError, setFetchError] = useState<boolean>(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -2400,12 +2411,10 @@ const AdDetail: React.FC<{
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
 
-  // Hard reset i nakon što ad učita (layout/paint mogu pregaziti prvi reset)
-  useEffect(() => {
+  // SYNC reset kad ad učita (layout se pomaknuo) – useLayoutEffect, bez RAF
+  useLayoutEffect(() => {
     if (!ad?.id) return;
     hardScrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
-    return () => cancelAnimationFrame(raf);
   }, [ad?.id]);
 
   const [similarAds, setSimilarAds] = useState<Ad[]>([]);
