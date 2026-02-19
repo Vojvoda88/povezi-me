@@ -488,6 +488,28 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser?.id, fetchFavorites, fetchNotifications, clearFavorites, clearNotifications]);
 
+  const fetchRatings = useCallback(() => {
+    fetch(`${API_BASE}/ratings`)
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return;
+        const mapped: Rating[] = data.map((r: any) => ({
+          id: r.id || `r-${r.sellerId}-${r.raterId}`,
+          sellerId: r.sellerId || '',
+          buyerId: r.raterId || '',
+          score: typeof r.score === 'number' ? r.score : 5,
+          comment: r.comment || undefined,
+          createdAt: r.createdAt ? new Date(r.createdAt).getTime() : Date.now(),
+        })).filter((r: Rating) => r.sellerId && r.buyerId);
+        setRatings(mapped);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchRatings();
+  }, [fetchRatings]);
+
   const handleLogout = () => {
     localStorage.removeItem(TOKEN_KEY);
     flushSync(() => setCurrentUser(null));
@@ -517,20 +539,30 @@ const AppContent: React.FC = () => {
     fetchAdsFirstPage(q);
   }, [location.pathname, location.search, adsAreFallback, ads.length]);
 
-  const addRating = (sellerId: string, score: number) => {
+  const addRating = useCallback((sellerId: string, score: number) => {
     if (!currentUser) return;
-    const newRating: Rating = {
+    const opt: Rating = {
       id: `r-${Date.now()}`, sellerId, buyerId: currentUser.id, score, createdAt: Date.now()
     };
-    setRatings(prev => [...prev.filter(r => !(r.sellerId === sellerId && r.buyerId === currentUser.id)), newRating]);
-  };
+    setRatings(prev => [...prev.filter(r => !(r.sellerId === sellerId && r.buyerId === currentUser.id)), opt]);
+    fetch(`${API_BASE}/ratings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ sellerId, score }),
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then((data: any) => {
+        if (data?.id) fetchRatings();
+      })
+      .catch(() => {});
+  }, [currentUser?.id, fetchRatings]);
 
   const getSellerMetrics = (sellerId: string) => {
     const sellerRatings = ratings.filter(r => r.sellerId === sellerId);
-    const avg = sellerRatings.length > 0 
-      ? sellerRatings.reduce((sum, r) => sum + r.score, 0) / sellerRatings.length 
-      : 5.0;
-    return { avg: avg.toFixed(1), count: sellerRatings.length };
+    const count = sellerRatings.length;
+    if (count === 0) return { avg: '—', count: 0 };
+    const avg = sellerRatings.reduce((sum, r) => sum + r.score, 0) / count;
+    return { avg: avg.toFixed(1), count };
   };
 
   // handleMarkNotificationRead i markMessageNotificationsReadForConversation sada dolaze iz useNotifications hook-a
@@ -2293,7 +2325,7 @@ const RatingSection = ({ sellerId, user, onAddRating, metrics }: { sellerId: str
         <div><h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF] mb-1">⭐ Ocijeni prodavca</h3></div>
         {!isSelf && user && (<div className="flex items-center gap-1.5 bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{[1, 2, 3, 4, 5].map((s) => (<button key={s} onMouseEnter={() => setHoverRating(s)} onMouseLeave={() => setHoverRating(0)} onClick={() => onAddRating(sellerId, s)} className="transition-all active:scale-125 p-1"><Star className={`w-6 h-6 ${s <= (hoverRating || 0) ? 'fill-amber-400 text-amber-400' : 'text-white/20'}`} /></button>))}</div>)}
       </div>
-      <div className="flex items-center gap-4 bg-white/5 p-6 rounded-xl border border-white/5"><div className="text-4xl font-black text-white">{metrics.avg}</div><div><div className="flex text-amber-400 gap-0.5 mb-1">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-10'}`} />)}</div><div className="text-[9px] text-[#9CA3AF] font-black uppercase tracking-widest">Bazirano na {metrics.count} recenzija</div></div></div>
+      <div className="flex items-center gap-4 bg-white/5 p-6 rounded-xl border border-white/5"><div className="text-4xl font-black text-white">{metrics.avg}</div><div><div className="flex text-amber-400 gap-0.5 mb-1">{[...Array(5)].map((_, i) => <Star key={i} className={`w-3.5 h-3.5 ${metrics.count > 0 && i < Math.round(Number(metrics.avg)) ? 'fill-current' : 'opacity-10'}`} />)}</div><div className="text-[9px] text-[#9CA3AF] font-black uppercase tracking-widest">{metrics.count === 0 ? 'Nema recenzija' : `Bazirano na ${metrics.count} recenzij${metrics.count === 1 ? 'a' : metrics.count >= 2 && metrics.count <= 4 ? 'e' : 'a'}`}</div></div></div>
     </div>
   );
 };
@@ -4197,6 +4229,7 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
   const [loading, setLoading] = useState(true);
   const showPendingBanner = searchParams.get('pending') === '1';
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [bumpingId, setBumpingId] = useState<string | null>(null);
 
   // Restore scroll pri povratku sa detail stranice
   useEffect(() => {
@@ -4248,6 +4281,14 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
       .finally(() => setUpdatingId(null));
   };
 
+  const handleBump = (adId: string) => {
+    setBumpingId(adId);
+    fetch(`${API_BASE}/ads/${adId}/extend`, { method: 'POST', headers: getAuthHeaders() })
+      .then(res => { if (res.ok) fetchMyAds(); onRefresh?.(); })
+      .catch(() => {})
+      .finally(() => setBumpingId(null));
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -4274,6 +4315,19 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
       {myAds.length === 0 ? (
         <EmptyState variant="no-ads" />
       ) : (
+        <>
+          <div className="mb-6 p-4 rounded-xl border flex flex-wrap items-center gap-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+            <div className="flex items-center gap-2">
+              <Eye className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+              <span className="text-sm font-bold text-white">{myAds.reduce((s, a) => s + (a.pogledi ?? 0), 0).toLocaleString()}</span>
+              <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>ukupno pregleda</span>
+            </div>
+            <div className="h-4 w-px bg-white/10" />
+            <div>
+              <span className="text-sm font-bold text-white">{myAds.length}</span>
+              <span className="text-xs font-medium ml-1" style={{ color: 'var(--text-secondary)' }}>oglasa</span>
+            </div>
+          </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {myAds.map(ad => (
             <div key={ad.id} className="relative group">
@@ -4281,23 +4335,37 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
               <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${ad.status === 'NA_CEKANJU' ? 'bg-sky-500/90' : ad.status === 'AKTIVAN' ? 'bg-emerald-500/90' : ad.status === 'PRODAN' ? 'bg-slate-500/90' : 'bg-amber-600/90'}`}>
                 {ad.status === 'NA_CEKANJU' ? 'Na čekanju' : ad.status}
               </span>
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 rounded-xl p-2 z-10">
-                <label className="text-[9px] font-bold text-[#9CA3AF] block mb-1">Status</label>
-                <select
-                  value={ad.status}
-                  onChange={e => handleStatusChange(ad.id, e.target.value as 'AKTIVAN' | 'PRODAN' | 'ISTEKAO' | 'NA_CEKANJU')}
-                  disabled={updatingId === ad.id || ad.status === 'NA_CEKANJU'}
-                  className="text-[9px] font-bold bg-[#131C2B] border border-white/20 rounded-lg px-2 py-1 text-white w-full"
-                >
-                  <option value="NA_CEKANJU">Na čekanju</option>
-                  <option value="AKTIVAN">Aktivan</option>
-                  <option value="PRODAN">Prodano</option>
-                  <option value="ISTEKAO">Istekao</option>
-                </select>
+              {(ad.pogledi ?? 0) > 0 && (
+                <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold bg-black/70 text-white/90 flex items-center gap-1">
+                  <Eye className="w-3 h-3" /> {(ad.pogledi ?? 0).toLocaleString()}
+                </span>
+              )}
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 rounded-xl p-2 z-10 flex flex-col gap-2">
+                {ad.status === 'AKTIVAN' && (
+                  <button type="button" onClick={() => handleBump(ad.id)} disabled={bumpingId === ad.id} className="flex items-center gap-1 text-[9px] font-bold text-[#4F6DFF] hover:text-white">
+                    {bumpingId === ad.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ArrowUpRight className="w-3 h-3" />}
+                    Podigni na vrh
+                  </button>
+                )}
+                <div>
+                  <label className="text-[9px] font-bold text-[#9CA3AF] block mb-1">Status</label>
+                  <select
+                    value={ad.status}
+                    onChange={e => handleStatusChange(ad.id, e.target.value as 'AKTIVAN' | 'PRODAN' | 'ISTEKAO' | 'NA_CEKANJU')}
+                    disabled={updatingId === ad.id || ad.status === 'NA_CEKANJU'}
+                    className="text-[9px] font-bold bg-[#131C2B] border border-white/20 rounded-lg px-2 py-1 text-white w-full"
+                  >
+                    <option value="NA_CEKANJU">Na čekanju</option>
+                    <option value="AKTIVAN">Aktivan</option>
+                    <option value="PRODAN">Prodano</option>
+                    <option value="ISTEKAO">Istekao</option>
+                  </select>
+                </div>
               </div>
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );

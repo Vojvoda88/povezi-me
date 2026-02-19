@@ -30,6 +30,7 @@ import clientLogRoutes from './routes/clientLog';
 import imgProxyRoutes from './routes/imgProxy';
 import vehicleRoutes from './routes/vehicles';
 import savedSearchesRoutes from './routes/savedSearches';
+import ratingsRoutes from './routes/ratings';
 import { getSupabase } from './lib/supabase';
 import { getHealthRedisClient } from './lib/redisHealth';
 
@@ -232,6 +233,7 @@ app.use('/api/favorites', favoritesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/saved-searches', savedSearchesRoutes);
+app.use('/api/ratings', ratingsRoutes);
 app.use('/api/admin', adminRoutes);
 
 const centralErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {

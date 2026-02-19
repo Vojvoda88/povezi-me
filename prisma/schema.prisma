@@ -313,3 +313,17 @@ model SavedSearch {
   @@index([userId])
   @@index([userId, createdAt])
 }
+
+model Rating {
+  id        String   @id @default(cuid())
+  sellerId  String   // prodavatelj koji se ocjenjuje
+  raterId   String   // korisnik koji ocjenjuje (kupac)
+  score     Int      // 1-5
+  comment   String?
+  adId      String?  // opciono - oglas u vezi s kojim je ocjena
+  createdAt DateTime @default(now())
+
+  @@unique([raterId, sellerId])
+  @@index([sellerId])
+  @@index([raterId])
+}
