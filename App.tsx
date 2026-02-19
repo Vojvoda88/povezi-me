@@ -3496,6 +3496,8 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     motoDetails: { marka: '', model: '', godiste: '', kilometraza: '', kubikaza: '', gorivo: '', mjenjac: '', tip: '', snagaKW: '', stanje: 'Polovno' }
   });
 
+  useEffect(() => { scrollToTop(); }, []);
+
   useEffect(() => {
     if (category !== MOTORNA_VOZILA_ID || !vehicleSubcategory || !VEHICLE_SUBCATEGORIES_FOR_API.includes(vehicleSubcategory)) {
       setMakesFromApi([]);
