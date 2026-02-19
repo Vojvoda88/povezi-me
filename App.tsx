@@ -832,21 +832,28 @@ const Marketplace: React.FC<{
   const stabilizerTimeoutsRef = useRef<number[]>([]);
   /** Dev: detekcija VirtualList onScroll(0) odmah nakon restore-a (list reset) */
   const justRestoredListOffsetRef = useRef<number | null>(null);
-  // Pri mountu / nakon back: pročitaj spremljenu scroll SAMO kad se vraćaš sa detail-a.
-  // KRITIČNO: useLayoutEffect da se refs postave PRIJE restore useLayoutEffect-a.
+
+  // Sync read pri renderu – da VirtualList dobije initialScrollOffset na prvi render.
+  const savedScrollForRestore = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) !== '1') return null;
+    try {
+      const listKey = getListRouteKey(location.pathname, location.search);
+      return loadScrollForList(listKey);
+    } catch { return null; }
+  }, [location.pathname, location.search]);
+
+  // Pri mountu / nakon back: postavi refs za restore (root scroll).
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
     const hasFlag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1';
-    if (import.meta.env?.DEV) console.log('[Marketplace] load effect', { hasFlag, pathname: location.pathname, search: location.search, key: location.key });
     if (!hasFlag) return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       listKeyRef.current = listKey;
-      const saved = loadScrollForList(listKey);
-      if (import.meta.env?.DEV) console.log('[Marketplace] saved scroll', saved ? { y: saved.y, virtualOffset: saved.virtualOffset } : null);
+      const saved = savedScrollForRestore || loadScrollForList(listKey);
       if (!saved) return;
-      // Jedan scroll owner: VirtualList ILI root (dual restore zabranjen)
       if (saved.virtualOffset != null && saved.virtualOffset > 0) {
         pendingListScrollRef.current = saved.virtualOffset;
         pendingScrollYRef.current = null;
@@ -860,8 +867,8 @@ const Marketplace: React.FC<{
       if (saved.y > 0 || (saved.virtualOffset != null && saved.virtualOffset > 0)) {
         if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       }
-    } catch (_) { /* sessionStorage može biti onemogućen */ }
-  }, [location.pathname, location.search, location.key]);
+    } catch (_) {}
+  }, [location.pathname, location.search, location.key, savedScrollForRestore]);
 
   // Vrati scroll nakon što se lista renderuje. SAMO kad su oglasi učitani (!adsLoading).
   // Ako restore na skeleton, render ga pregazi. clearListScroll tek nakon uspješnog restore-a.
@@ -877,7 +884,6 @@ const Marketplace: React.FC<{
 
     const applyWindow = (): boolean => {
       try {
-        // VirtualList aktivan: ne diraj root.scrollTop (jedan scroll owner)
         if (pendingListScrollRef.current != null || pendingScrollYRef.current == null || windowRestored) return windowRestored;
         const savedY = pendingScrollYRef.current;
         const root1 = getScrollRoot();
@@ -885,22 +891,16 @@ const Marketplace: React.FC<{
         const maxScroll = scrollEl && scrollEl !== window
           ? (scrollEl as HTMLElement).scrollHeight - (scrollEl as HTMLElement).clientHeight
           : document.documentElement.scrollHeight - window.innerHeight;
-        if (maxScroll <= 0) return false;
         const y = Math.min(savedY, Math.max(0, maxScroll));
+        if (y <= 0) return false;
         restoreScroll(y);
         const currentTop = scrollEl && scrollEl !== window
           ? (scrollEl as HTMLElement).scrollTop
           : (typeof window !== 'undefined' ? window.scrollY : 0);
-        if (Math.abs(currentTop - y) <= 2) {
-          if (import.meta.env?.DEV) console.log('[Marketplace] restore scroll y=', y);
+        if (Math.abs(currentTop - y) <= 5) {
           lastRestoredYRef.current = y;
           windowRestored = true;
           pendingScrollYRef.current = null;
-          if (import.meta.env?.DEV) setTimeout(() => {
-            const root2 = getScrollRoot();
-            const st = root2 && root2 !== window ? (root2 as HTMLElement).scrollTop : window.scrollY;
-            console.log('[Marketplace] root same?', root1 === root2, root1, root2, 'scrollTop', st);
-          }, 50);
           return true;
         }
       } catch (_) {}
@@ -979,24 +979,30 @@ const Marketplace: React.FC<{
     }
 
     const raf = requestAnimationFrame(() => requestAnimationFrame(run));
-    const t0 = setTimeout(run, 100);
-    const t1 = setTimeout(run, 150);   // retry za kasni render/virtualizaciju
-    const t2 = setTimeout(run, 300);
-    const t3 = setTimeout(run, 600);
-    const t4 = setTimeout(run, 1000);
-    const t5 = setTimeout(run, 1500);
+    const delays = [0, 50, 100, 150, 250, 400, 600, 1000, 1500, 2500];
+    const timeouts = delays.map((d) => setTimeout(run, d));
     return () => {
       cancelAnimationFrame(raf);
-      clearTimeout(t0);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      clearTimeout(t4);
-      clearTimeout(t5);
+      timeouts.forEach(clearTimeout);
       stabilizerTimeoutsRef.current.forEach(clearTimeout);
       stabilizerTimeoutsRef.current = [];
     };
   }, [adsLoading, ads.length, location.key]);
+
+  // Kad VirtualList koristi initialScrollOffset, odmah clear refs i storage.
+  useEffect(() => {
+    if (!savedScrollForRestore?.virtualOffset || !useVirtualList) return;
+    pendingListScrollRef.current = null;
+    pendingScrollYRef.current = null;
+    const listKey = listKeyRef.current || getListRouteKey(location.pathname, location.search);
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.removeItem(RETURN_TO_MARKETPLACE_KEY);
+        clearListScroll(listKey);
+      } catch {}
+    }, 300);
+    return () => clearTimeout(t);
+  }, [savedScrollForRestore?.virtualOffset, useVirtualList, location.pathname, location.search]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
@@ -1542,6 +1548,7 @@ const Marketplace: React.FC<{
                 itemCount={virtualRowCount}
                 itemSize={dynamicRowHeight}
                 overscanCount={VIRTUAL_OVERSCAN}
+                initialScrollOffset={savedScrollForRestore?.virtualOffset ?? 0}
                 style={{ overflowX: 'hidden' }}
                 onScroll={({ scrollOffset }) => {
                   virtualListScrollRef.current = scrollOffset;
