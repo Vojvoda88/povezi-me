@@ -14,8 +14,7 @@ export function getScrollRoot(): ScrollContainer {
   if (typeof document === 'undefined') return null;
   const el = document.querySelector('[data-scroll-root]');
   if (el && el instanceof HTMLElement) return el;
-  if (document.scrollingElement && document.scrollingElement !== document.body)
-    return document.scrollingElement as HTMLElement;
+  if (document.scrollingElement) return document.scrollingElement as HTMLElement;
   return typeof window !== 'undefined' ? window : null;
 }
 
@@ -42,7 +41,7 @@ export function getScrollTop(): number {
 }
 
 /**
- * Postavlja scrollTop = y.
+ * Postavlja scrollTop = y (alias: setScrollTop).
  */
 export function restoreScroll(y: number): void {
   const el = getScrollRoot();
@@ -54,7 +53,10 @@ export function restoreScroll(y: number): void {
   } catch (_) {}
 }
 
-const SCROLL_PREFIX = 'scroll:';
+/** Alias za restoreScroll. */
+export const setScrollTop = restoreScroll;
+
+const SCROLL_LIST_PREFIX = 'scroll:list:';
 
 /**
  * Generiše listRouteKey: pathname + search (npr. /marketplace?q=auto ili /admin/pending).
@@ -72,7 +74,7 @@ export function saveScrollForList(listRouteKey: string, virtualOffset?: number):
   try {
     const y = getScrollTop();
     const payload = virtualOffset != null ? JSON.stringify({ y: Math.round(y), l: Math.round(virtualOffset) }) : String(Math.round(y));
-    sessionStorage.setItem(SCROLL_PREFIX + listRouteKey, payload);
+    sessionStorage.setItem(SCROLL_LIST_PREFIX + listRouteKey, payload);
   } catch (_) {}
 }
 
@@ -83,7 +85,7 @@ export function saveScrollForList(listRouteKey: string, virtualOffset?: number):
 export function loadAndClearScrollForList(listRouteKey: string): { y: number; virtualOffset?: number } | null {
   if (typeof sessionStorage === 'undefined') return null;
   try {
-    const key = SCROLL_PREFIX + listRouteKey;
+    const key = SCROLL_LIST_PREFIX + listRouteKey;
     const raw = sessionStorage.getItem(key);
     sessionStorage.removeItem(key);
     if (!raw) return null;

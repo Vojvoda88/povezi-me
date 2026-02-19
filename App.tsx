@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import {
   scrollToTop,
@@ -2056,27 +2056,6 @@ export const AdDetailView: React.FC<{
     return () => setPageMeta('Poveži.ME - Premium Marketplace', DEFAULT_DESCRIPTION);
   }, [ad?.id, ad?.naslov, ad?.opis, ad?.slike, setPageMeta]);
 
-  // Detail uvijek krene od vrha – public i admin
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const routeKey = ad?.slug || ad?.id;
-    if (!routeKey) return;
-    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    scrollToTop();
-    const raf = requestAnimationFrame(scrollToTop);
-    const t0 = setTimeout(scrollToTop, 0);
-    const t1 = setTimeout(scrollToTop, 50);
-    const t2 = setTimeout(scrollToTop, 150);
-    const t3 = setTimeout(scrollToTop, 300);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(t0);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-    };
-  }, [ad?.slug, ad?.id]);
-
   const getImageSrc = (url: string): string => {
     if (fullyFailedUrls.has(url)) return TRANSPARENT_1X1;
     if (proxyFailedUrls.has(url)) return url.startsWith('http://') ? 'https://' + url.slice(7) : url;
@@ -2356,6 +2335,16 @@ const AdDetail: React.FC<{
   const navigate = useNavigate();
   const location = useLocation();
   const [adFromApi, setAdFromApi] = useState<Ad | null | undefined>(undefined);
+
+  // Detail route: OBAVEZNO reset na vrh - odmah pri ulasku (prije paint), 2x rAF da pobijedi kasnija setovanja
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!slug) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    scrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(scrollToTop));
+    return () => cancelAnimationFrame(raf);
+  }, [slug, location.pathname, location.key]);
   const [fetchError, setFetchError] = useState<boolean>(false);
   const abortRef = useRef<AbortController | null>(null);
   const loadAd = useCallback(() => {

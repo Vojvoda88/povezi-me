@@ -1,7 +1,7 @@
 /**
  * Admin panel – rute i komponente. Koristi postojeće stilove (var(--bg-page), var(--accent) itd.).
  */
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, FileText, Flag, CreditCard, LogOut, ChevronLeft,
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
-import { getListRouteKey, saveScrollForList, loadAndClearScrollForList, restoreScroll } from './lib/scroll';
+import { getListRouteKey, saveScrollForList, loadAndClearScrollForList, restoreScroll, scrollToTop } from './lib/scroll';
 import { mapApiAdToAd } from './features/ads/mappers';
 
 const API_BASE = getApiBase();
@@ -582,6 +582,16 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, 
   const navigate = useNavigate();
   const location = useLocation();
   const url = slug ? `${API_BASE}/admin/ads/by-slug/${encodeURIComponent(slug)}` : null;
+
+  // Detail route (admin preview): OBAVEZNO reset na vrh - odmah pri ulasku, 2x rAF
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!slug) return;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    scrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(scrollToTop));
+    return () => cancelAnimationFrame(raf);
+  }, [slug, location.pathname, location.key]);
   const { data: rawAd, loading, error, refetch } = useAdminFetch<any>(url);
 
   const approve = () => {
