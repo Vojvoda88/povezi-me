@@ -14,6 +14,8 @@ export function getScrollRoot(): ScrollContainer {
   if (typeof document === 'undefined') return null;
   const el = document.querySelector('[data-scroll-root]');
   if (el && el instanceof HTMLElement) return el;
+  const resetEl = document.querySelector('[data-scroll-reset]');
+  if (resetEl && resetEl instanceof HTMLElement) return resetEl;
   if (document.scrollingElement) return document.scrollingElement as HTMLElement;
   return typeof window !== 'undefined' ? window : null;
 }
@@ -27,6 +29,25 @@ export function scrollToTop(): void {
   try {
     if (el === window) window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     else (el as HTMLElement).scrollTop = 0;
+  } catch (_) {}
+}
+
+/**
+ * Hard reset - resetta SVE moguće scroll targete (pobijeda sve što pregaža).
+ * Koristi se na ulasku u detail rutu.
+ */
+export function hardScrollToTop(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const root = getScrollRoot();
+    if (root instanceof HTMLElement) root.scrollTop = 0;
+    document.querySelectorAll('[data-scroll-root], [data-scroll-reset]').forEach((el) => {
+      if (el instanceof HTMLElement) el.scrollTop = 0;
+    });
+    if (document.scrollingElement) (document.scrollingElement as HTMLElement).scrollTop = 0;
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
   } catch (_) {}
 }
 
@@ -63,6 +84,11 @@ const SCROLL_LIST_PREFIX = 'scroll:list:';
  */
 export function getListRouteKey(pathname: string, search: string = ''): string {
   return pathname + (search || '');
+}
+
+/** Da li je pathname detail ruta (nikad restore na njoj). */
+export function isDetailRoute(pathname: string): boolean {
+  return /^\/oglas\/[^/]+$/.test(pathname) || /\/admin\/oglas-preview\/[^/]+$/.test(pathname);
 }
 
 /**

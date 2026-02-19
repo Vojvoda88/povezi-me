@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { User } from './types';
 import { getApiBase } from './api';
-import { getListRouteKey, saveScrollForList, loadAndClearScrollForList, restoreScroll, scrollToTop } from './lib/scroll';
+import { getListRouteKey, saveScrollForList, loadAndClearScrollForList, restoreScroll, hardScrollToTop, isDetailRoute } from './lib/scroll';
 import { mapApiAdToAd } from './features/ads/mappers';
 
 const API_BASE = getApiBase();
@@ -187,7 +187,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ))}
         </div>
       </div>
-      <main className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0" data-scroll-root>{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 max-w-7xl mx-auto w-full min-w-0" data-scroll-reset>{children}</main>
     </div>
   );
 };
@@ -372,6 +372,7 @@ export const AdminAds: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     const listKey = getListRouteKey(location.pathname, location.search);
     const saved = loadAndClearScrollForList(listKey);
     if (!saved || saved.y <= 0) return;
@@ -484,6 +485,7 @@ export const AdminPendingAds: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     const listKey = getListRouteKey(location.pathname, location.search);
     const saved = loadAndClearScrollForList(listKey);
     if (!saved || saved.y <= 0) return;
@@ -583,13 +585,13 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, 
   const location = useLocation();
   const url = slug ? `${API_BASE}/admin/ads/by-slug/${encodeURIComponent(slug)}` : null;
 
-  // Detail route (admin preview): OBAVEZNO reset na vrh - odmah pri ulasku, 2x rAF
+  // Detail route (admin preview): hard reset na vrh - odmah pri ulasku, 2x rAF
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!slug) return;
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    scrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(scrollToTop));
+    hardScrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
     return () => cancelAnimationFrame(raf);
   }, [slug, location.pathname, location.key]);
   const { data: rawAd, loading, error, refetch } = useAdminFetch<any>(url);
@@ -604,6 +606,14 @@ const AdminAdPreview: React.FC<AdminAdPreviewProps> = ({ AdDetailViewComponent, 
     fetch(`${API_BASE}/admin/ads/${rawAd.id}`, { method: 'DELETE', headers: getAuthHeaders() })
       .then(res => res.ok && navigate('/admin/pending'));
   };
+
+  // Hard reset i nakon što ad učita
+  useEffect(() => {
+    if (!rawAd?.id) return;
+    hardScrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
+    return () => cancelAnimationFrame(raf);
+  }, [rawAd?.id]);
 
   if (loading && !rawAd) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} /></div>;
   if (error || !rawAd) return (

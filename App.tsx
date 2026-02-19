@@ -2,12 +2,14 @@ import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallba
 import { flushSync, createPortal } from 'react-dom';
 import {
   scrollToTop,
+  hardScrollToTop,
   getScrollRoot,
   getScrollTop,
   restoreScroll,
   getListRouteKey,
   saveScrollForList,
   loadAndClearScrollForList,
+  isDetailRoute,
 } from './lib/scroll';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { 
@@ -820,6 +822,7 @@ const Marketplace: React.FC<{
   // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice)
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       const saved = loadAndClearScrollForList(listKey);
@@ -2336,13 +2339,13 @@ const AdDetail: React.FC<{
   const location = useLocation();
   const [adFromApi, setAdFromApi] = useState<Ad | null | undefined>(undefined);
 
-  // Detail route: OBAVEZNO reset na vrh - odmah pri ulasku (prije paint), 2x rAF da pobijedi kasnija setovanja
+  // Detail route: hard reset na vrh - odmah pri ulasku, 2x rAF, i ponovo kad ad učita
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!slug) return;
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-    scrollToTop();
-    const raf = requestAnimationFrame(() => requestAnimationFrame(scrollToTop));
+    hardScrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
     return () => cancelAnimationFrame(raf);
   }, [slug, location.pathname, location.key]);
   const [fetchError, setFetchError] = useState<boolean>(false);
@@ -2384,6 +2387,14 @@ const AdDetail: React.FC<{
 
   const ad = adFromApi !== undefined ? adFromApi : ads.find(a => a.slug === slug);
   const sellerAdsCount = useMemo(() => ad ? (adFromApi ? 1 : ads.filter(a => a.vlasnikId === ad.vlasnikId).length) : 0, [ad?.vlasnikId, ads, adFromApi]);
+
+  // Hard reset i nakon što ad učita (layout/paint mogu pregaziti prvi reset)
+  useEffect(() => {
+    if (!ad?.id) return;
+    hardScrollToTop();
+    const raf = requestAnimationFrame(() => requestAnimationFrame(hardScrollToTop));
+    return () => cancelAnimationFrame(raf);
+  }, [ad?.id]);
 
   const [similarAds, setSimilarAds] = useState<Ad[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -2479,6 +2490,7 @@ const PublicProfile: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     const listKey = getListRouteKey(location.pathname, location.search);
     const saved = loadAndClearScrollForList(listKey);
     if (!saved || saved.y <= 0) return;
@@ -3804,6 +3816,7 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
   // Restore scroll pri povratku sa detail stranice
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     const listKey = getListRouteKey(location.pathname, location.search);
     const saved = loadAndClearScrollForList(listKey);
     if (!saved || saved.y <= 0) return;
@@ -3912,6 +3925,7 @@ const MyFavorites: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: 
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isDetailRoute(location.pathname)) return;
     const listKey = getListRouteKey(location.pathname, location.search);
     const saved = loadAndClearScrollForList(listKey);
     if (!saved || saved.y <= 0) return;
