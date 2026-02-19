@@ -22,7 +22,7 @@ import {
   LogOut, Send, ArrowLeft, Bell, AlertTriangle, Zap, XCircle, Loader2, Rocket, Heart,
   ChevronRight as ChevronRightIcon, StarHalf, MessageCircle, SlidersHorizontal, Camera,
   Instagram, Facebook, Trash, Settings2, Info, Calendar, UserCheck, ChevronRight, Share2, Award, SearchX,
-  Plus, ChevronDown, Check, Upload, Sun, Moon, BookmarkPlus
+  Plus, ChevronDown, Check, Upload, Sun, Moon, BookmarkPlus, Map
 } from 'lucide-react';
 
 import {
@@ -42,6 +42,7 @@ import { getFallbackMakeItems, getFallbackModelItems, hasFallbackCatalog } from 
 import { FixedSizeList as VirtualList } from 'react-window';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
+const MarketplaceMap = React.lazy(() => import('./components/MarketplaceMap').then(m => ({ default: m.MarketplaceMap })));
 import { FormField } from './components/FormField';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
@@ -827,6 +828,7 @@ const Marketplace: React.FC<{
   const [saveSearchNaziv, setSaveSearchNaziv] = useState('');
   const [saveSearchLoading, setSaveSearchLoading] = useState(false);
   const [saveSearchError, setSaveSearchError] = useState('');
+  const [viewMode, setViewMode] = useState<'lista' | 'mapa'>('lista');
   const searchQuery = searchParams.get('q') || "";
   const pendingScrollYRef = useRef<number | null>(null);
   /** Scroll offset unutar VirtualList-a (samo kad je lista virtualizirana). */
@@ -1659,7 +1661,24 @@ const Marketplace: React.FC<{
         </div>
       )}
 
-      {filtered.length > 0 ? (
+      {filtered.length > 0 && (
+        <div className="px-4 flex items-center gap-2 pb-3">
+          <button type="button" onClick={() => setViewMode('lista')} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-xs font-bold uppercase ${viewMode === 'lista' ? 'bg-[#4F6DFF] text-white' : 'bg-white/5 text-[#9CA3AF] border border-white/10'}`}>
+            <SlidersHorizontal className="w-4 h-4" /> Lista
+          </button>
+          <button type="button" onClick={() => setViewMode('mapa')} className={`flex items-center gap-2 h-10 px-4 rounded-xl text-xs font-bold uppercase ${viewMode === 'mapa' ? 'bg-[#4F6DFF] text-white' : 'bg-white/5 text-[#9CA3AF] border border-white/10'}`}>
+            <Map className="w-4 h-4" /> Mapa
+          </button>
+        </div>
+      )}
+
+      {viewMode === 'mapa' && filtered.length > 0 ? (
+        <div className="px-4">
+          <React.Suspense fallback={<div className="h-[400px] rounded-2xl bg-[#131C2B] animate-pulse" />}>
+            <MarketplaceMap ads={filtered} getAdLink={(ad) => `/oglas/${ad.slug || ad.id}`} />
+          </React.Suspense>
+        </div>
+      ) : filtered.length > 0 ? (
         <>
           {useVirtualList && virtualListSize.width > 0 ? (
             <div

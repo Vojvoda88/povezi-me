@@ -106,6 +106,21 @@ export const LOCATIONS = [
   'Podgorica', 'Budva', 'Kotor', 'Tivat', 'Nikšić', 'Bar', 'Herceg Novi', 'Bijelo Polje', 'Cetinje', 'Ulcinj', 'Pljevlja'
 ];
 
+/** Koordinate centra grada [lat, lng] za prikaz na mapi (OpenStreetMap). */
+export const LOCATION_COORDS: Record<string, [number, number]> = {
+  'Podgorica': [42.4304, 19.2594],
+  'Budva': [42.2780, 18.8417],
+  'Kotor': [42.4247, 18.7712],
+  'Tivat': [42.4236, 18.6969],
+  'Nikšić': [42.7731, 18.9445],
+  'Bar': [42.0914, 19.0899],
+  'Herceg Novi': [42.4531, 18.5314],
+  'Bijelo Polje': [43.0383, 19.7476],
+  'Cetinje': [42.3908, 18.9142],
+  'Ulcinj': [41.9236, 19.2056],
+  'Pljevlja': [43.3569, 19.3583],
+};
+
 export const STANJE_OPTIONS = ['Polovno', 'Novo', 'Oštećeno'];
 
 export const MOTO_CATALOG: Record<string, string[]> = {
