@@ -309,7 +309,16 @@ const timeAgo = (date: number) => {
 };
 
 const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' }) => {
-  const img = <img src="/logo-full.png" alt="Poveži.ME" className="h-10 sm:h-12 w-auto object-contain" />;
+  const img = (
+    <img
+      src="/logo-full.png"
+      alt="Poveži.ME"
+      className="h-14 sm:h-16 w-auto min-h-[48px] object-contain"
+      width={160}
+      height={72}
+      fetchPriority="high"
+    />
+  );
   if (variant === 'vertical') {
     return (
       <div className="flex flex-col items-center gap-2">
@@ -317,7 +326,7 @@ const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' 
       </div>
     );
   }
-  return <div className="flex items-center">{img}</div>;
+  return <div className="flex items-center shrink-0" style={{ minWidth: 100 }}>{img}</div>;
 };
 
 const mapApiUserToUser = (u: any): User => ({
@@ -360,6 +369,11 @@ const AppContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [pendingAdminCount, setPendingAdminCount] = useState<number>(0);
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(() => {
+    try { return sessionStorage.getItem('povezi_install_banner_dismissed') === '1'; } catch { return false; }
+  });
+  const [installBannerHint, setInstallBannerHint] = useState(false);
+  const pwaBanner = usePWAInstall();
 
   useEffect(() => {
     if (currentUser?.role !== 'admin') {
@@ -619,6 +633,28 @@ const AppContent: React.FC = () => {
           </div>
         </main>
         
+        {pwaBanner.showInstallLink && !installBannerDismissed && (
+          <div className="lg:hidden fixed bottom-[72px] left-2 right-2 z-[1099] animate-slide-up">
+            <div className="rounded-xl border shadow-xl flex items-center justify-between gap-3 px-4 py-3" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
+              <div className="flex items-center gap-2 min-w-0">
+                <Smartphone className="w-5 h-5 shrink-0" style={{ color: 'var(--accent)' }} />
+                <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Preuzmi aplikaciju</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => {
+                  if (pwaBanner.canInstall) pwaBanner.promptInstall();
+                  else setInstallBannerHint(!installBannerHint);
+                }} className="h-9 px-4 rounded-lg text-[10px] font-black uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Preuzmi</button>
+                <button type="button" onClick={() => { setInstallBannerDismissed(true); try { sessionStorage.setItem('povezi_install_banner_dismissed', '1'); } catch {} }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-secondary)' }} aria-label="Zatvori"><X className="w-4 h-4" /></button>
+              </div>
+            </div>
+            {installBannerHint && !pwaBanner.canInstall && (
+              <div className="mt-2 rounded-xl border px-3 py-2 text-[10px]" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                {pwaBanner.isIOS ? 'Safari: Share (⋁) → Dodaj na početni ekran' : pwaBanner.isMobile ? 'Chrome: meni ⋮ → Instaliraj aplikaciju' : 'Chrome: meni ⋮ → Instaliraj Povezi.ME'}
+              </div>
+            )}
+          </div>
+        )}
         <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[1100] px-1 py-1.5 pb-safe shadow-lg border-t transition-colors flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)' }}>
           <Link to="/marketplace" onClick={() => setMobileSearchOpen(true)} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors" style={{ color: (location.pathname === '/' || location.pathname === '/marketplace') ? 'var(--accent)' : 'var(--text-secondary)' }}>
             <Search className="w-5 h-5" />
@@ -784,7 +820,22 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
                       </div>
                     )}
                   </>
-                ) : null
+                ) : (
+                  <>
+                    <button type="button" onClick={() => setShowIOSInstallHint(!showIOSInstallHint)} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
+                      <Smartphone className="w-4 h-4 shrink-0" /> Preuzmi aplikaciju
+                    </button>
+                    {showIOSInstallHint && (
+                      <div className="px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
+                        {pwa.isMobile ? (
+                          <>U Chrome-u: pritisni meni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>⋮</span> (tri tačke) pa izaberi &quot;Instaliraj aplikaciju&quot; ili &quot;Dodaj na početni ekran&quot;.</>
+                        ) : (
+                          <>U Chrome-u: pritisni meni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>⋮</span> (tri tačke) pa izaberi &quot;Instaliraj Povezi.ME&quot;. Možda će opcija biti dostupna nakon par posjeta.</>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )
               )}
               {user?.role === 'admin' && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex items-center justify-between gap-3 p-3 font-bold rounded-xl transition-all" style={{ color: 'var(--text-primary)' }}>
@@ -4634,7 +4685,7 @@ const LegalPage: React.FC<{ title: string; content: React.ReactNode }> = ({ titl
 const Footer = () => (
   <footer className="flex-shrink-0 pt-3 pb-14 px-3 lg:py-6 lg:px-4 lg:pb-6 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
     <div className="flex flex-col items-center gap-1 lg:gap-2">
-      <img src="/logo-full.png" alt="Poveži.ME" className="h-10 lg:h-14 w-auto object-contain" />
+      <img src="/logo-full.png" alt="Poveži.ME" className="h-14 lg:h-20 w-auto object-contain" />
     </div>
     <nav className="flex flex-wrap justify-center gap-2 lg:gap-3 mt-2 lg:mt-3">
       <Link to="/pravila" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>

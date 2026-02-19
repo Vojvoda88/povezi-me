@@ -42,12 +42,17 @@ export function usePWAInstall() {
     await deferredPrompt.prompt();
   }, [deferredPrompt]);
 
-  // Prikaži link ako: nije instalirano i (ima prompt) ili je iOS
-  const showInstallLink = !isInstalled && (!!deferredPrompt || isIOS);
+  const isAndroid = /Android/i.test(navigator.userAgent || '');
+  const isMobile = isIOS || isAndroid;
+
+  // Prikaži link svima koji nisu instalirali – ne čekaj na beforeinstallprompt (rijetko se javlja novim korisnicima)
+  const showInstallLink = !isInstalled;
 
   return {
     canInstall: !!deferredPrompt,
     isIOS,
+    isAndroid,
+    isMobile,
     isInstalled,
     showInstallLink,
     promptInstall,
