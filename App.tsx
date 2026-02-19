@@ -309,23 +309,31 @@ const timeAgo = (date: number) => {
 };
 
 const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' }) => {
-  const src = variant === 'horizontal' ? '/logo-header.png' : '/logo-full.png';
-  const img = (
-    <img
-      src={src}
-      alt="Poveži.ME"
-      className="h-12 sm:h-14 lg:h-16 w-auto object-contain"
-      fetchPriority="high"
-    />
+  const icon = (
+    <img src="/logo-icon.svg" alt="" className="h-9 sm:h-10 lg:h-11 w-9 sm:w-10 lg:w-11 object-contain shrink-0" />
+  );
+  const text = (
+    <span className="font-bold tracking-tight whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
+      Poveži<span style={{ color: 'var(--accent)' }}>.ME</span>
+    </span>
   );
   if (variant === 'vertical') {
     return (
       <div className="flex flex-col items-center gap-2">
-        {img}
+        {icon}
+        {text}
       </div>
     );
   }
-  return <div className="flex items-center shrink-0">{img}</div>;
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      {icon}
+      <div className="flex flex-col justify-center leading-tight">
+        <span className="text-base sm:text-lg lg:text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Poveži<span style={{ color: 'var(--accent)' }}>.ME</span></span>
+        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:block" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</span>
+      </div>
+    </div>
+  );
 };
 
 const mapApiUserToUser = (u: any): User => ({
@@ -654,7 +662,8 @@ const AppContent: React.FC = () => {
             )}
           </div>
         )}
-        <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[1100] px-1 py-1.5 pb-safe shadow-lg border-t transition-colors flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)' }}>
+        {createPortal(
+          <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[9999] px-1 py-1.5 pb-safe shadow-lg border-t flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-nav)', pointerEvents: 'auto' }}>
           <Link to="/marketplace" onClick={() => setMobileSearchOpen(true)} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors" style={{ color: (location.pathname === '/' || location.pathname === '/marketplace') ? 'var(--accent)' : 'var(--text-secondary)' }}>
             <Search className="w-5 h-5" />
             <span className="text-[9px] font-bold uppercase tracking-tight">Traži</span>
@@ -668,7 +677,9 @@ const AppContent: React.FC = () => {
           </Link>
           <NavLink to="/moji-favoriti" icon={<Heart className="w-5 h-5" />} label="Sačuvano" />
           <NavLink to="/moji-oglasi" icon={<UserIcon className="w-5 h-5" />} label="Profil" />
-        </div>
+        </div>,
+          document.body
+        )}
         <Footer />
         {isMobileView && (() => {
           const q = new URLSearchParams(location.search);
@@ -4683,8 +4694,8 @@ const LegalPage: React.FC<{ title: string; content: React.ReactNode }> = ({ titl
 
 const Footer = () => (
   <footer className="flex-shrink-0 pt-3 pb-14 px-3 lg:py-6 lg:px-4 lg:pb-6 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
-    <div className="flex flex-col items-center gap-1 lg:gap-2">
-      <img src="/logo-full.png" alt="Poveži.ME" className="h-14 lg:h-20 w-auto object-contain" />
+    <div className="flex flex-col items-center gap-2">
+      <Logo variant="vertical" />
     </div>
     <nav className="flex flex-wrap justify-center gap-2 lg:gap-3 mt-2 lg:mt-3">
       <Link to="/pravila" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>
