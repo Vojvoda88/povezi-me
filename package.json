@@ -28,6 +28,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "node scripts/migrate-deploy.js",
     "migrate:deploy": "node scripts/migrate-deploy.js",
+    "db:validate": "node scripts/db-validate-production.js",
     "db:seed": "prisma db seed",
     "deploy:check": "node scripts/deploy-check.js",
     "deploy:jwt": "node scripts/generate-jwt-secret.js",

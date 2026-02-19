@@ -32,11 +32,11 @@ const STATS_CACHE_MS = 60_000;
 // ----- Stats (dashboard) -----
 router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Request, res: Response) => {
   const s = res as any;
-  const now = Date.now();
-  if (statsCache && now - statsCache.at < STATS_CACHE_MS) {
-    return s.json(statsCache.data);
-  }
   try {
+    const now = Date.now();
+    if (statsCache && now - statsCache.at < STATS_CACHE_MS) {
+      return s.json(statsCache.data);
+    }
     const [
       totalUsers,
       totalAds,
@@ -66,23 +66,26 @@ router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Requ
         include: { images: { orderBy: { order: 'asc' }, take: 1 }, vlasnik: { select: { ime: true, email: true } } }
       })
     ]);
-    const revenueTotal = (revenueAgg._sum?.amount ?? 0) / 100;
+    const revenueTotal = (revenueAgg?._sum?.amount ?? 0) / 100;
     const data = {
-      totalUsers,
-      totalAds,
-      activeAds,
-      premiumAds,
-      reportedAds: reportedAdsCount,
-      pendingAds: pendingAdsCount,
+      totalUsers: totalUsers ?? 0,
+      totalAds: totalAds ?? 0,
+      activeAds: activeAds ?? 0,
+      premiumAds: premiumAds ?? 0,
+      reportedAds: reportedAdsCount ?? 0,
+      pendingAds: pendingAdsCount ?? 0,
       revenueTotal,
-      lastUsers,
-      lastAds
+      lastUsers: lastUsers ?? [],
+      lastAds: lastAds ?? []
     };
     statsCache = { data, at: now };
-    s.json(data);
-  } catch (err) {
-    console.error('Admin stats:', err);
-    s.status(500).json({ error: 'Greška pri učitavanju statistike' });
+    return s.json(data);
+  } catch (err: any) {
+    const e = err as Error;
+    console.error('[admin/stats]', e?.message ?? e);
+    if (e?.stack) console.error('[admin/stats] stack:', e.stack);
+    if (err?.cause) console.error('[admin/stats] cause:', err.cause);
+    return s.status(500).json({ error: 'Greška pri učitavanju statistike' });
   }
 }) as any);
 
