@@ -1,11 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="96" fill="url(#g)"/>
-  <path d="M160 160h80v192h-80V160zm0 256h80v48h-80v-48z" fill="white"/>
-  <path d="M240 200h112c44 0 80 36 80 80s-36 80-80 80H240V200z" fill="white" fill-opacity=".9"/>
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
       <stop stop-color="#4F6DFF"/>
       <stop offset="1" stop-color="#3D56D6"/>
     </linearGradient>
   </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Lijeva ruka – od donje lijeve prema centru -->
+  <path d="M80 340h56c20 0 36-16 36-36v-48c0-12 10-22 22-22h32l24-36c6-10 17-16 28-16h24c22 0 40 18 40 40v28l-24 22v74H80z" fill="white"/>
+  <!-- Desna ruka – simetrično -->
+  <path d="M432 340h-56c-20 0-36-16-36-36v-48c0-12-10-22-22-22h-32l-24-36c-6-10-17-16-28-16h-24c-22 0-40 18-40 40v28l24 22v74h64z" fill="white"/>
+  <!-- Sredina – spoj ruku (handshake grip) -->
+  <path d="M216 256c-11 0-22 4-30 12l-36 32 14 16 36-32c5-4 11-6 18-6s13 2 18 6l36 32 14-16-36-32c-8-8-19-12-30-12h-24zm80 0c-11 0-22 4-30 12l-36 32 14 16 36-32c5-4 11-6 18-6s13 2 18 6l36 32 14-16-36-32c-8-8-19-12-30-12h-24z" fill="white"/>
 </svg>

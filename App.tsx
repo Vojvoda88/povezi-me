@@ -22,7 +22,7 @@ import {
   LogOut, Send, ArrowLeft, Bell, AlertTriangle, Zap, XCircle, Loader2, Rocket, Heart,
   ChevronRight as ChevronRightIcon, StarHalf, MessageCircle, SlidersHorizontal, Camera,
   Instagram, Facebook, Trash, Settings2, Info, Calendar, UserCheck, ChevronRight, Share2, Award, SearchX,
-  Plus, ChevronDown, Check, Upload, Sun, Moon, BookmarkPlus, Map
+  Plus, ChevronDown, Check, Upload, Sun, Moon, BookmarkPlus, Map, Smartphone
 } from 'lucide-react';
 
 import {
@@ -52,6 +52,7 @@ import { apiFetch } from './lib/api/client';
 import { useAds } from './hooks/useAds';
 import { useFavorites } from './hooks/useFavorites';
 import { useNotifications } from './hooks/useNotifications';
+import { usePWAInstall } from './src/hooks/usePWAInstall';
 import { mapApiAdToAd } from './features/ads/mappers';
 import { io, type Socket } from 'socket.io-client';
 const API_BASE = getApiBase();
@@ -680,8 +681,10 @@ const App: React.FC = () => (
 const Header: React.FC<{ user: User | null, notifications: Notification[], favoritesCount: number, onLogout: () => void, theme: ThemeId, onThemeChange: (t: ThemeId) => void, mobileSearchOpen?: boolean, onMobileSearchOpenChange?: (open: boolean) => void, pendingAdminCount?: number }> = ({ user, notifications, favoritesCount, onLogout, theme, onThemeChange, mobileSearchOpen = false, onMobileSearchOpenChange, pendingAdminCount = 0 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [showIOSInstallHint, setShowIOSInstallHint] = useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const pwa = usePWAInstall();
   const [searchParams] = useSearchParams();
   const unreadCount = notifications.filter(n => !n.procitano).length;
   const hasPendingAds = user?.role === 'admin' && pendingAdminCount > 0;
@@ -788,6 +791,24 @@ const Header: React.FC<{ user: User | null, notifications: Notification[], favor
                 <>
                   <MenuLink to="/prijava" icon={<UserIcon className="w-4 h-4" />} label="Prijavi se" onClick={() => setMenuOpen(false)} />
                 </>
+              )}
+              {pwa.showInstallLink && (
+                pwa.canInstall ? (
+                  <button type="button" onClick={() => { pwa.promptInstall(); setMenuOpen(false); }} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
+                    <Smartphone className="w-4 h-4 shrink-0" /> Preuzmi aplikaciju
+                  </button>
+                ) : pwa.isIOS ? (
+                  <>
+                    <button type="button" onClick={() => setShowIOSInstallHint(!showIOSInstallHint)} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
+                      <Smartphone className="w-4 h-4 shrink-0" /> Dodaj na početni ekran
+                    </button>
+                    {showIOSInstallHint && (
+                      <div className="px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
+                        Pritisni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Share</span> (ikonu deljenja) u Safari-ju, pa izaberi &quot;Dodaj na početni ekran&quot;.
+                      </div>
+                    )}
+                  </>
+                ) : null
               )}
               {user?.role === 'admin' && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex items-center justify-between gap-3 p-3 font-bold rounded-xl transition-all" style={{ color: 'var(--text-primary)' }}>
