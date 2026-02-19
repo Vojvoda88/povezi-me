@@ -11,6 +11,7 @@ import {
   loadScrollForList,
   clearListScroll,
   RETURN_TO_MARKETPLACE_KEY,
+  SCROLL_TO_AD_SLUG_KEY,
   isDetailRoute,
 } from './lib/scroll';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
@@ -843,12 +844,14 @@ const Marketplace: React.FC<{
     } catch { return null; }
   }, [location.pathname, location.search]);
 
-  // Pri mountu / nakon back: postavi refs za restore (root scroll).
+  // Pri mountu / nakon back: postavi refs za restore (osim kad imamo slug – tad scrollIntoView).
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
     const hasFlag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1';
     if (!hasFlag) return;
+    const hasSlug = !!sessionStorage.getItem(SCROLL_TO_AD_SLUG_KEY);
+    if (hasSlug) return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       listKeyRef.current = listKey;
@@ -1003,6 +1006,43 @@ const Marketplace: React.FC<{
     }, 300);
     return () => clearTimeout(t);
   }, [savedScrollForRestore?.virtualOffset, location.pathname, location.search]);
+
+  // scrollIntoView: na povratak sa oglasa, skroluj do kliknutog oglasa (pouzdano)
+  useEffect(() => {
+    if (adsLoading) return;
+    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) !== '1') return;
+    const slug = sessionStorage.getItem(SCROLL_TO_AD_SLUG_KEY);
+    if (!slug) return;
+    let cleared = false;
+    const scrollToEl = () => {
+      const el = document.querySelector(`[data-ad-slug="${CSS.escape(slug)}"]`);
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ block: 'center', behavior: 'auto' });
+        if (!cleared) {
+          cleared = true;
+          try {
+            sessionStorage.removeItem(SCROLL_TO_AD_SLUG_KEY);
+            sessionStorage.removeItem(RETURN_TO_MARKETPLACE_KEY);
+            clearListScroll(getListRouteKey(location.pathname, location.search));
+          } catch {}
+        }
+      }
+    };
+    const t1 = setTimeout(scrollToEl, 50);
+    const t2 = setTimeout(scrollToEl, 200);
+    const t3 = setTimeout(scrollToEl, 500);
+    const t4 = setTimeout(() => {
+      if (!cleared) {
+        cleared = true;
+        try {
+          sessionStorage.removeItem(SCROLL_TO_AD_SLUG_KEY);
+          sessionStorage.removeItem(RETURN_TO_MARKETPLACE_KEY);
+          clearListScroll(getListRouteKey(location.pathname, location.search));
+        } catch {}
+      }
+    }, 800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+  }, [adsLoading, location.pathname, location.search]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
@@ -1239,11 +1279,12 @@ const Marketplace: React.FC<{
     setFilters(DEFAULT_FILTERS);
   };
 
-  const saveScrollBeforeNavigate = useCallback(() => {
+  const saveScrollBeforeNavigate = useCallback((adSlug?: string) => {
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       saveScrollForList(listKey, Math.round(virtualListScrollRef.current));
       sessionStorage.setItem(RETURN_TO_MARKETPLACE_KEY, '1');
+      if (adSlug) sessionStorage.setItem(SCROLL_TO_AD_SLUG_KEY, adSlug);
     } catch (_) {}
   }, [location.pathname, location.search]);
 
@@ -1953,8 +1994,8 @@ const AdCardInner: React.FC<{
   imgWidth?: number;
   /** Prvih nekoliko karata: high za brži LCP. */
   fetchPriority?: 'high' | 'low';
-  /** Poziva se prije navigacije na oglas (npr. da se spremi scroll pozicija liste). */
-  onBeforeNavigate?: () => void;
+  /** Poziva se prije navigacije na oglas (npr. da se spremi scroll pozicija liste). Prima ad slug. */
+  onBeforeNavigate?: (adSlug: string) => void;
 }> = ({ ad, isFavorite, onToggleFavorite, linksDisabled, onFallbackClick, debugAdsError, debugAdsAreFallback, imgWidth = 400, fetchPriority = 'low', onBeforeNavigate }) => {
   const location = useLocation();
   const now = Date.now();
@@ -2023,7 +2064,7 @@ const AdCardInner: React.FC<{
         rel="noopener"
         className={className}
         onClick={() => {
-          onBeforeNavigate?.();
+          onBeforeNavigate?.(ad.slug);
           if (typeof window !== 'undefined' && !onBeforeNavigate) {
             try {
               saveScrollForList(getListRouteKey(location.pathname, location.search));
@@ -2041,6 +2082,7 @@ const AdCardInner: React.FC<{
 
   return (
     <div
+      data-ad-slug={ad.slug}
       className="group rounded-[18px] overflow-hidden flex flex-col relative transition-all duration-300 tap-scale min-h-[280px] sm:min-h-[260px]"
       style={{
         backgroundColor: 'var(--bg-card)',

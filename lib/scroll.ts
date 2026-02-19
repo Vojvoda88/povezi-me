@@ -82,6 +82,7 @@ export const setScrollTop = restoreScroll;
 
 const SCROLL_LIST_PREFIX = 'scroll:list:';
 export const RETURN_TO_MARKETPLACE_KEY = 'returnTo:marketplace';
+export const SCROLL_TO_AD_SLUG_KEY = 'scrollToAd:slug';
 
 /**
  * Generiše listRouteKey: pathname + search (npr. /marketplace?q=auto ili /admin/pending).
