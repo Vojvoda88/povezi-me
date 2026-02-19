@@ -552,8 +552,9 @@ const AppContent: React.FC = () => {
 
   if (location.pathname.startsWith('/admin')) {
     return (
-      <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-page)' }}><Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent)' }} /></div>}>
-        <AdminRoutes
+      <ErrorBoundary>
+        <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-page)' }}><Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent)' }} /></div>}>
+          <AdminRoutes
           user={currentUser}
           onLogin={(u) => setCurrentUser(mapApiUserToUser(u))}
           AdDetailViewComponent={AdDetailView}
@@ -564,7 +565,8 @@ const AppContent: React.FC = () => {
           getSellerMetrics={getSellerMetrics}
           setPageMeta={setPageMeta}
         />
-      </React.Suspense>
+        </React.Suspense>
+      </ErrorBoundary>
     );
   }
 

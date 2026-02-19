@@ -29,6 +29,8 @@ function getAdminId(req: Request): string {
 let statsCache: { data: unknown; at: number } | null = null;
 const STATS_CACHE_MS = 60_000;
 
+const FALLBACK_STATS_OBJ = { totalUsers: 0, totalAds: 0, activeAds: 0, premiumAds: 0, reportedAds: 0, pendingAds: 0, revenueTotal: 0, lastUsers: [] as any[], lastAds: [] as any[] };
+
 // ----- Stats (dashboard) -----
 router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Request, res: Response) => {
   const s = res as any;
@@ -82,10 +84,10 @@ router.get('/stats', authenticate as any, requireAdmin as any, (async (req: Requ
     return s.json(data);
   } catch (err: any) {
     const e = err as Error;
-    console.error('[admin/stats]', e?.message ?? e);
+    console.error('[admin/stats] DB error:', e?.message ?? e);
     if (e?.stack) console.error('[admin/stats] stack:', e.stack);
     if (err?.cause) console.error('[admin/stats] cause:', err.cause);
-    return s.status(500).json({ error: 'Greška pri učitavanju statistike' });
+    return s.status(200).json(FALLBACK_STATS_OBJ);
   }
 }) as any);
 

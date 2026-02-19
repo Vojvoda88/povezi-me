@@ -22,6 +22,8 @@ const getAuthHeaders = (): HeadersInit => {
 
 const FETCH_TIMEOUT_MS = 10000;
 
+const FALLBACK_STATS = { totalUsers: 0, totalAds: 0, activeAds: 0, premiumAds: 0, reportedAds: 0, pendingAds: 0, revenueTotal: 0, lastUsers: [] as any[], lastAds: [] as any[] };
+
 function useAdminFetch<T>(url: string | null, options?: RequestInit): { data: T | null; loading: boolean; error: string | null; refetch: () => void } {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(!!url);
@@ -37,21 +39,54 @@ function useAdminFetch<T>(url: string | null, options?: RequestInit): { data: T 
     setLoading(true);
     setError(null);
     const timer = setTimeout(() => abortRef.current?.abort(), FETCH_TIMEOUT_MS);
-    fetch(url, { ...options, signal: abortRef.current.signal, headers: { ...getAuthHeaders(), ...options?.headers } })
-      .then(res => {
-        if (!res.ok) throw new Error(res.status === 401 ? 'Neautorizovano' : res.status === 403 ? 'Pristup zabranjen' : 'Greška servera');
-        return res.json();
-      })
-      .then((d: T) => {
-        if (n === fetchRef.current) setData(d);
-      })
-      .catch((e: Error) => {
-        if (n === fetchRef.current && e.name !== 'AbortError') setError(e.message || 'Greška');
-      })
-      .finally(() => {
-        clearTimeout(timer);
-        if (n === fetchRef.current) setLoading(false);
-      });
+    const finish = () => { clearTimeout(timer); if (n === fetchRef.current) setLoading(false); };
+    (async () => {
+      try {
+        const res = await fetch(url, { ...options, signal: abortRef.current!.signal, headers: { ...getAuthHeaders(), ...(options?.headers as Record<string, string>) } });
+        let d: unknown;
+        try {
+          d = await res.json();
+        } catch (parseErr) {
+          if (n === fetchRef.current) {
+            console.warn('[useAdminFetch] Invalid JSON:', url);
+            setError('Nevalidan odgovor servera');
+            setData(null);
+          }
+          return finish();
+        }
+        if (!res.ok) {
+          const msg = (d && typeof d === 'object' && 'error' in d && typeof (d as { error?: unknown }).error === 'string')
+            ? (d as { error: string }).error
+            : (res.status === 401 ? 'Neautorizovano' : res.status === 403 ? 'Pristup zabranjen' : `Greška servera (${res.status})`);
+          if (n === fetchRef.current) {
+            setError(msg);
+            setData(url.includes('/admin/stats') ? (FALLBACK_STATS as T) : null);
+          }
+          return finish();
+        }
+        if (d && typeof d === 'object' && !Array.isArray(d)) {
+          if ('error' in d && typeof (d as { error?: unknown }).error === 'string') {
+            if (n === fetchRef.current) {
+              setError((d as { error: string }).error);
+              setData(url.includes('/admin/stats') ? (FALLBACK_STATS as T) : null);
+            }
+          } else if (n === fetchRef.current) {
+            setError(null);
+            setData(d as T);
+          }
+        } else if (n === fetchRef.current) {
+          console.warn('[useAdminFetch] Response not a valid object:', url);
+          setData(url.includes('/admin/stats') ? (FALLBACK_STATS as T) : null);
+        }
+      } catch (e: unknown) {
+        if (n === fetchRef.current && (e as Error)?.name !== 'AbortError') {
+          setError((e as Error)?.message || 'Greška');
+          setData(url?.includes('/admin/stats') ? (FALLBACK_STATS as T) : null);
+        }
+      } finally {
+        finish();
+      }
+    })();
     return () => abortRef.current?.abort();
   }, [url, options?.method]);
 
@@ -208,19 +243,28 @@ export const AdminDashboard: React.FC = () => {
       <button type="button" onClick={refetch} className="px-4 py-2 rounded-xl text-sm font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Pokušaj ponovo</button>
     </div>
   );
-  const s = data!;
+  if (!data) return (
+    <div className="py-8 flex flex-col items-center gap-4">
+      <SearchX className="w-12 h-12" style={{ color: 'var(--text-secondary)' }} />
+      <p style={{ color: 'var(--text-secondary)' }}>Nema podataka</p>
+      <button type="button" onClick={refetch} className="px-4 py-2 rounded-xl text-sm font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Pokušaj ponovo</button>
+    </div>
+  );
+  const s = data as Record<string, unknown>;
+  const lastUsers = Array.isArray(s.lastUsers) ? s.lastUsers : [];
+  const lastAds = Array.isArray(s.lastAds) ? s.lastAds : [];
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-black uppercase tracking-widest">Dashboard</h1>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
         {[
-          { label: 'Korisnici', value: s.totalUsers },
-          { label: 'Oglasi', value: s.totalAds },
-          { label: 'Aktivni', value: s.activeAds },
-          { label: 'Premium', value: s.premiumAds },
+          { label: 'Korisnici', value: s.totalUsers ?? 0 },
+          { label: 'Oglasi', value: s.totalAds ?? 0 },
+          { label: 'Aktivni', value: s.activeAds ?? 0 },
+          { label: 'Premium', value: s.premiumAds ?? 0 },
           { label: 'Na čekanju', value: s.pendingAds ?? 0, href: '/admin/pending' },
-          { label: 'Prijave (otvorene)', value: s.reportedAds },
-          { label: 'Prihodi (€)', value: s.revenueTotal }
+          { label: 'Prijave (otvorene)', value: s.reportedAds ?? 0 },
+          { label: 'Prihodi (€)', value: s.revenueTotal ?? 0 }
         ].map(({ label, value, href }) => (
           href ? (
             <Link key={label} to={href} className="p-3 sm:p-4 rounded-xl border block" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
@@ -238,9 +282,9 @@ export const AdminDashboard: React.FC = () => {
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
           <h2 className="text-sm font-black uppercase mb-3">Poslednjih 5 korisnika</h2>
-          {s.lastUsers.length === 0 ? <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nema</p> : (
+          {lastUsers.length === 0 ? <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nema</p> : (
             <ul className="space-y-2">
-              {s.lastUsers.map((u: { id: string; ime: string; email: string }) => (
+              {lastUsers.map((u: { id: string; ime: string; email: string }) => (
                 <li key={u.id} className="flex justify-between text-sm"><span>{u.ime}</span><span style={{ color: 'var(--text-secondary)' }}>{u.email}</span></li>
               ))}
             </ul>
@@ -248,9 +292,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
         <div className="rounded-xl border p-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
           <h2 className="text-sm font-black uppercase mb-3">Poslednjih 5 oglasa</h2>
-          {s.lastAds.length === 0 ? <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nema</p> : (
+          {lastAds.length === 0 ? <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nema</p> : (
             <ul className="space-y-2">
-              {s.lastAds.map((a: { id: string; naslov: string; slug: string; vlasnik: { ime: string } }) => (
+              {lastAds.map((a: { id: string; naslov: string; slug: string; vlasnik?: { ime?: string } }) => (
                 <li key={a.id} className="flex justify-between text-sm"><Link to={`/admin/ads?slug=${a.slug}`} className="hover:underline" style={{ color: 'var(--accent)' }}>{a.naslov}</Link><span style={{ color: 'var(--text-secondary)' }}>{a.vlasnik?.ime}</span></li>
               ))}
             </ul>
