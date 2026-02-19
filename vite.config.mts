@@ -21,7 +21,7 @@ export default defineConfig(() => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['logo-full.png', 'icon-512.png'],
+        includeAssets: ['logo-full.png', 'logo-header.png', 'icon-512.png'],
         manifest: {
           name: 'Poveži.ME - Premium Marketplace',
           short_name: 'Poveži.ME',

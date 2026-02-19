@@ -309,13 +309,12 @@ const timeAgo = (date: number) => {
 };
 
 const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' }) => {
+  const src = variant === 'horizontal' ? '/logo-header.png' : '/logo-full.png';
   const img = (
     <img
-      src="/logo-full.png"
+      src={src}
       alt="Poveži.ME"
-      className="h-14 sm:h-16 w-auto min-h-[48px] object-contain"
-      width={160}
-      height={72}
+      className="h-12 sm:h-14 lg:h-16 w-auto object-contain"
       fetchPriority="high"
     />
   );
@@ -326,7 +325,7 @@ const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' 
       </div>
     );
   }
-  return <div className="flex items-center shrink-0" style={{ minWidth: 100 }}>{img}</div>;
+  return <div className="flex items-center shrink-0">{img}</div>;
 };
 
 const mapApiUserToUser = (u: any): User => ({
