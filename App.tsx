@@ -507,10 +507,11 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (isDetailRoute(location.pathname)) return;
-    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1') return;
+    const hasReturnFlag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1';
+    if (hasReturnFlag && !adsAreFallback && ads.length > 0) return;
     const q = getAdsQueryFromLocation(location);
     fetchAdsFirstPage(q);
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, adsAreFallback, ads.length]);
 
   const addRating = (sellerId: string, score: number) => {
     if (!currentUser) return;
