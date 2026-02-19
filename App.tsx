@@ -655,29 +655,50 @@ const AppContent: React.FC = () => {
                 <button type="button" onClick={() => { setInstallBannerDismissed(true); try { sessionStorage.setItem('povezi_install_banner_dismissed', '1'); } catch {} }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-secondary)' }} aria-label="Zatvori"><X className="w-4 h-4" /></button>
               </div>
             </div>
-            {installBannerHint && !pwaBanner.canInstall && (
-              <div className="mt-2 rounded-xl border px-3 py-2 text-[10px]" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                {pwaBanner.isIOS ? 'Safari: Share (⋁) → Dodaj na početni ekran' : pwaBanner.isMobile ? 'Chrome: meni ⋮ → Instaliraj aplikaciju' : 'Chrome: meni ⋮ → Instaliraj Povezi.ME'}
+            {(pwaBanner.isIOS || !pwaBanner.canInstall || installBannerHint) && (
+              <div className="mt-2 rounded-xl border px-3 py-2 text-[11px]" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                {pwaBanner.isIOS ? (
+                  <>
+                    <p className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>iPhone – koristi Safari:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-[10px]">
+                      <li>Otvori u <strong>Safari</strong> (ne Chrome)</li>
+                      <li>Pritisni <strong>Share</strong> (↑)</li>
+                      <li>„Dodaj na početni ekran“</li>
+                    </ol>
+                  </>
+                ) : pwaBanner.isMobile ? 'Chrome: meni ⋮ → Instaliraj aplikaciju' : 'Chrome: meni ⋮ → Instaliraj Povezi.ME'}
               </div>
             )}
           </div>
         )}
         {createPortal(
-          <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[9999] px-1 py-1.5 pb-safe shadow-lg border-t flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-nav)', pointerEvents: 'auto' }}>
-          <Link to="/marketplace" onClick={() => setMobileSearchOpen(true)} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors" style={{ color: (location.pathname === '/' || location.pathname === '/marketplace') ? 'var(--accent)' : 'var(--text-secondary)' }}>
-            <Search className="w-5 h-5" />
-            <span className="text-[9px] font-bold uppercase tracking-tight">Traži</span>
-          </Link>
-          {SHOW_CHAT && <NavLink to="/poruke" icon={<MessageCircle className="w-5 h-5" />} label="Poruke" count={notifications.filter(n => !n.procitano && n.tip === 'message').length} />}
-          <Link to="/objavi" className="flex flex-col items-center gap-1 py-1 w-16 -translate-y-1 active:scale-95 transition-transform" title="Dodaj oglas">
-            <span className="w-11 h-11 rounded-full flex items-center justify-center border-2 shadow-md" style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--bg-page)' }}>
-              <PlusCircle className="w-6 h-6 text-white" />
-            </span>
-            <span className="text-[9px] font-bold uppercase tracking-tight" style={{ color: 'var(--accent)' }}>Dodaj oglas</span>
-          </Link>
-          <NavLink to="/moji-favoriti" icon={<Heart className="w-5 h-5" />} label="Sačuvano" />
-          <NavLink to="/moji-oglasi" icon={<UserIcon className="w-5 h-5" />} label="Profil" />
-        </div>,
+          <nav role="navigation" aria-label="Donji meni" className="povezi-bottom-nav lg:hidden fixed inset-x-0 bottom-0 z-[99999] px-1 py-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.3)] border-t flex justify-around items-stretch" style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-nav)', minHeight: 56, touchAction: 'manipulation' }}>
+            <button type="button" onClick={() => { setMobileSearchOpen(true); navigate('/marketplace'); }} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 min-h-[48px] active:opacity-80" style={{ color: (location.pathname === '/' || location.pathname === '/marketplace') ? 'var(--accent)' : 'var(--text-secondary)' }}>
+              <Search className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-tight">Traži</span>
+            </button>
+            {SHOW_CHAT && (
+              <button type="button" onClick={() => navigate('/poruke')} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 min-h-[48px] active:opacity-80 relative" style={{ color: location.pathname === '/poruke' ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                <MessageCircle className="w-5 h-5 shrink-0" />
+                <span className="text-[9px] font-bold uppercase tracking-tight">Poruke</span>
+                {notifications.filter(n => !n.procitano && n.tip === 'message').length > 0 && <span className="absolute top-0 right-1/4 w-2 h-2 bg-red-500 rounded-full" />}
+              </button>
+            )}
+            <button type="button" onClick={() => navigate('/objavi')} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 min-h-[48px] -translate-y-1 active:scale-95">
+              <span className="w-11 h-11 rounded-full flex items-center justify-center border-2 shadow-md" style={{ backgroundColor: 'var(--accent)', borderColor: 'var(--bg-page)' }}>
+                <PlusCircle className="w-6 h-6 text-white" />
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-tight" style={{ color: 'var(--accent)' }}>Dodaj</span>
+            </button>
+            <button type="button" onClick={() => navigate('/moji-favoriti')} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 min-h-[48px] active:opacity-80" style={{ color: location.pathname === '/moji-favoriti' ? 'var(--accent)' : 'var(--text-secondary)' }}>
+              <Heart className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-tight">Sačuvano</span>
+            </button>
+            <button type="button" onClick={() => navigate('/moji-oglasi')} className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 min-h-[48px] active:opacity-80" style={{ color: location.pathname === '/moji-oglasi' ? 'var(--accent)' : 'var(--text-secondary)' }}>
+              <UserIcon className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-tight">Profil</span>
+            </button>
+          </nav>,
           document.body
         )}
         <Footer />
