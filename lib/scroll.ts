@@ -34,10 +34,13 @@ export function scrollToTop(): void {
 
 /**
  * Hard reset - resetta SVE moguće scroll targete (pobijeda sve što pregaža).
- * Koristi se na ulasku u detail rutu.
+ * Koristi se SAMO na ulasku u detail rutu.
+ * Guard: ne resetira ako smo na list ruti (da ne pregazi restore pri povratku).
  */
 export function hardScrollToTop(): void {
   if (typeof window === 'undefined') return;
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+  if (pathname && !isDetailRoute(pathname)) return; // nikad reset na list rutama
   try {
     const root = getScrollRoot();
     if (root instanceof HTMLElement) root.scrollTop = 0;

@@ -836,7 +836,10 @@ const Marketplace: React.FC<{
   }, [location.pathname, location.search]);
 
   // Vrati scroll nakon što se lista renderuje (window + eventualno VirtualList)
-  useEffect(() => {
+  // useLayoutEffect: restore PRIJE paint-a, da ne vidiš flash na vrhu
+  // Okida se kad su oglasi učitani (adsLoaded) da VirtualList/DOM postoji za restore
+  const adsLoaded = !adsLoading || ads.length > 0;
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     const hasPendingWindow = pendingScrollYRef.current != null;
     const hasPendingList = pendingListScrollRef.current != null;
@@ -874,26 +877,25 @@ const Marketplace: React.FC<{
     const run = () => {
       applyWindow();
       applyList();
-      if (pendingScrollYRef.current == null && pendingListScrollRef.current == null) {
-        /* key već obrisan u loadAndClearScrollForList */
-      }
     };
 
-    const raf = requestAnimationFrame(() => { run(); setTimeout(run, 0); });
-    const t1 = setTimeout(run, 100);
+    const raf = requestAnimationFrame(() => requestAnimationFrame(run));
+    const t0 = setTimeout(run, 100);
+    const t1 = setTimeout(run, 150);   // retry za kasni render/virtualizaciju
     const t2 = setTimeout(run, 300);
     const t3 = setTimeout(run, 600);
     const t4 = setTimeout(run, 1000);
     const t5 = setTimeout(run, 1500);
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
       clearTimeout(t5);
     };
-  }, [adsLoading, ads.length]);
+  }, [adsLoaded, adsLoading, ads.length]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
