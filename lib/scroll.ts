@@ -107,17 +107,10 @@ export function saveScrollForList(listRouteKey: string, virtualOffset?: number):
   } catch (_) {}
 }
 
-/**
- * Učita spremljenu scroll poziciju. Vraća null ako nema ili invalid.
- * Briše key nakon čitanja (restore samo jednom).
- */
-export function loadAndClearScrollForList(listRouteKey: string): { y: number; virtualOffset?: number } | null {
-  if (typeof sessionStorage === 'undefined') return null;
+/** Parsira raw sessionStorage vrijednost. */
+function parseScrollPayload(raw: string): { y: number; virtualOffset?: number } | null {
+  if (!raw) return null;
   try {
-    const key = SCROLL_LIST_PREFIX + listRouteKey;
-    const raw = sessionStorage.getItem(key);
-    sessionStorage.removeItem(key);
-    if (!raw) return null;
     if (raw.startsWith('{')) {
       const parsed = JSON.parse(raw) as { y?: number; l?: number };
       const y = typeof parsed.y === 'number' && parsed.y >= 0 ? parsed.y : typeof parsed.w === 'number' ? parsed.w : 0;
@@ -126,7 +119,46 @@ export function loadAndClearScrollForList(listRouteKey: string): { y: number; vi
     }
     const y = parseInt(raw, 10);
     return !Number.isNaN(y) && y >= 0 ? { y } : null;
-  } catch (_) {
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Učita spremljenu scroll poziciju bez brisanja. Vraća null ako nema.
+ * Koristi se za restore; clearListScroll treba pozvati nakon uspješnog restore-a.
+ */
+export function loadScrollForList(listRouteKey: string): { y: number; virtualOffset?: number } | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(SCROLL_LIST_PREFIX + listRouteKey);
+    return parseScrollPayload(raw || '');
+  } catch {
+    return null;
+  }
+}
+
+/** Obriše spremljenu scroll poziciju. Pozvati tek nakon uspješnog restore-a. */
+export function clearListScroll(listRouteKey: string): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.removeItem(SCROLL_LIST_PREFIX + listRouteKey);
+  } catch {}
+}
+
+/**
+ * Učita spremljenu scroll poziciju. Vraća null ako nema ili invalid.
+ * Briše key nakon čitanja (restore samo jednom).
+ * @deprecated Prefer loadScrollForList + clearListScroll nakon uspješnog restore-a.
+ */
+export function loadAndClearScrollForList(listRouteKey: string): { y: number; virtualOffset?: number } | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const key = SCROLL_LIST_PREFIX + listRouteKey;
+    const raw = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    return parseScrollPayload(raw || '');
+  } catch {
     return null;
   }
 }

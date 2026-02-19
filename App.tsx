@@ -8,7 +8,8 @@ import {
   restoreScroll,
   getListRouteKey,
   saveScrollForList,
-  loadAndClearScrollForList,
+  loadScrollForList,
+  clearListScroll,
   isDetailRoute,
 } from './lib/scroll';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
@@ -819,13 +820,15 @@ const Marketplace: React.FC<{
   const virtualListRef = useRef<{ scrollTo: (offset: number) => void } | null>(null);
   const virtualListScrollRef = useRef(0);
 
-  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice)
+  const listKeyRef = useRef<string>('');
+  // Pri mountu: pročitaj spremljenu scroll poziciju (vraćanje sa detail stranice) - NE BRIŠI još
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
-      const saved = loadAndClearScrollForList(listKey);
+      listKeyRef.current = listKey;
+      const saved = loadScrollForList(listKey);
       if (!saved) return;
       pendingScrollYRef.current = saved.y;
       if (saved.virtualOffset != null) pendingListScrollRef.current = saved.virtualOffset;
@@ -835,20 +838,21 @@ const Marketplace: React.FC<{
     } catch (_) { /* sessionStorage može biti onemogućen */ }
   }, [location.pathname, location.search]);
 
-  // Vrati scroll nakon što se lista renderuje (window + eventualno VirtualList)
-  // useLayoutEffect: restore PRIJE paint-a, da ne vidiš flash na vrhu
-  // Okida se kad su oglasi učitani (adsLoaded) da VirtualList/DOM postoji za restore
-  const adsLoaded = !adsLoading || ads.length > 0;
+  // Vrati scroll nakon što se lista renderuje. SAMO kad su oglasi učitani (!adsLoading).
+  // Ako restore na skeleton, render ga pregazi. clearListScroll tek nakon uspješnog restore-a.
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
+    if (adsLoading) return; // čekaj da lista bude renderovana, ne restore na skeleton
     const hasPendingWindow = pendingScrollYRef.current != null;
     const hasPendingList = pendingListScrollRef.current != null;
     if (!hasPendingWindow && !hasPendingList) return;
 
-    let windowApplied = false;
+    let windowRestored = false;
+    let listRestored = false;
+
     const applyWindow = () => {
       try {
-        if (pendingScrollYRef.current == null || windowApplied) return;
+        if (pendingScrollYRef.current == null || windowRestored) return;
         const savedY = pendingScrollYRef.current;
         const scrollEl = getScrollRoot();
         const maxScroll = scrollEl && scrollEl !== window
@@ -857,19 +861,20 @@ const Marketplace: React.FC<{
         if (maxScroll > 0) {
           const y = Math.min(savedY, Math.max(0, maxScroll));
           restoreScroll(y);
+          windowRestored = true;
+          pendingScrollYRef.current = null;
         }
-        windowApplied = true;
-        pendingScrollYRef.current = null;
       } catch (_) {}
     };
 
     const applyList = () => {
       try {
-        if (pendingListScrollRef.current == null) return;
+        if (pendingListScrollRef.current == null || listRestored) return;
         const list = virtualListRef.current;
         if (!list || typeof list.scrollTo !== 'function') return;
         const offset = Math.max(0, pendingListScrollRef.current);
         list.scrollTo(offset);
+        listRestored = true;
         pendingListScrollRef.current = null;
       } catch (_) {}
     };
@@ -877,6 +882,11 @@ const Marketplace: React.FC<{
     const run = () => {
       applyWindow();
       applyList();
+      const key = listKeyRef.current;
+      if (pendingScrollYRef.current == null && pendingListScrollRef.current == null && key) {
+        clearListScroll(key);
+        listKeyRef.current = '';
+      }
     };
 
     const raf = requestAnimationFrame(() => requestAnimationFrame(run));
@@ -895,7 +905,7 @@ const Marketplace: React.FC<{
       clearTimeout(t4);
       clearTimeout(t5);
     };
-  }, [adsLoaded, adsLoading, ads.length]);
+  }, [adsLoading, ads.length]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
