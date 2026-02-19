@@ -21,7 +21,7 @@ export default defineConfig(() => {
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg'],
+        includeAssets: ['logo-full.png', 'icon-512.png'],
         manifest: {
           name: 'Poveži.ME - Premium Marketplace',
           short_name: 'Poveži.ME',
@@ -32,8 +32,9 @@ export default defineConfig(() => {
           start_url: '/',
           lang: 'sr-Latn',
           icons: [
-            { src: '/icon.svg', type: 'image/svg+xml', sizes: 'any', purpose: 'any' },
-            { src: '/icon.svg', type: 'image/svg+xml', sizes: '512x512', purpose: 'maskable' },
+            { src: '/icon-512.png', type: 'image/png', sizes: '512x512', purpose: 'any' },
+            { src: '/icon-512.png', type: 'image/png', sizes: '512x512', purpose: 'maskable' },
+            { src: '/icon-512.png', type: 'image/png', sizes: '192x192', purpose: 'any' },
           ],
         },
         workbox: {

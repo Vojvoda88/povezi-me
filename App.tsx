@@ -308,40 +308,16 @@ const timeAgo = (date: number) => {
   return new Date(date).toLocaleDateString();
 };
 
-const LogoSymbol = ({ type = 1, className = "w-8 h-8 sm:w-10 sm:h-10" }: { type?: 1 | 2 | 3, className?: string }) => {
-  if (type === 1) {
-    return (
-      <svg viewBox="0 0 40 40" className={className} fill="none" xmlns="http://www.w3.org/2000/svg" style={{ color: 'var(--accent)' }}>
-        <circle cx="15" cy="20" r="9" stroke="currentColor" strokeWidth="2.5" />
-        <circle cx="25" cy="20" r="9" stroke="currentColor" strokeWidth="2.5" style={{ opacity: 0.85 }} />
-        <path d="M20 13.5C21.5 15.2 22.4 17.5 22.4 20C22.4 22.5 21.5 24.8 20 26.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ opacity: 0.9 }} />
-      </svg>
-    );
-  }
-  return null;
-};
-
 const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' }) => {
+  const img = <img src="/logo-full.png" alt="Poveži.ME" className="h-10 sm:h-12 w-auto object-contain" />;
   if (variant === 'vertical') {
     return (
       <div className="flex flex-col items-center gap-2">
-        <LogoSymbol type={1} className="w-12 h-12" />
-        <div className="text-center">
-          <div className="text-2xl font-bold tracking-tighter" style={{ color: 'var(--text-primary)' }}>Poveži.ME</div>
-          <div className="text-[9px] font-black uppercase tracking-[0.25em] mt-0.5" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</div>
-        </div>
+        {img}
       </div>
     );
   }
-  return (
-    <div className="flex items-center gap-3 group">
-      <LogoSymbol type={1} />
-      <div className="flex flex-col justify-center">
-        <div className="text-lg sm:text-xl font-bold tracking-tighter leading-none mb-1" style={{ color: 'var(--text-primary)' }}>Poveži.ME</div>
-        <div className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.25em] leading-none" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</div>
-      </div>
-    </div>
-  );
+  return <div className="flex items-center">{img}</div>;
 };
 
 const mapApiUserToUser = (u: any): User => ({
@@ -643,7 +619,7 @@ const AppContent: React.FC = () => {
           </div>
         </main>
         
-        <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[1000] px-1 py-1.5 pb-safe shadow-lg border-t transition-colors flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)' }}>
+        <div className="povezi-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-[1100] px-1 py-1.5 pb-safe shadow-lg border-t transition-colors flex justify-around items-center" style={{ borderColor: 'var(--border-subtle)' }}>
           <Link to="/marketplace" onClick={() => setMobileSearchOpen(true)} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors" style={{ color: (location.pathname === '/' || location.pathname === '/marketplace') ? 'var(--accent)' : 'var(--text-secondary)' }}>
             <Search className="w-5 h-5" />
             <span className="text-[9px] font-bold uppercase tracking-tight">Traži</span>
@@ -839,7 +815,7 @@ const NavLink = ({ to, icon, label, count }: { to: string, icon: React.ReactNode
   const location = useLocation();
   const isActive = location.pathname === to;
   return (
-    <Link to={to} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors" style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}>
+    <Link to={to} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors cursor-pointer min-h-[44px] justify-center" style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}>
       <div className="relative">{icon}{count ? count > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" /> : null}</div>
       <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
     </Link>
@@ -2671,7 +2647,7 @@ export const AdDetailView: React.FC<{
                   );
                 })()}
                 {SHOW_CHAT && user && !isOwner && (
-                  <Link to={`/poruke?ad=${ad.id}`} className="w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
+                  <Link to={`/poruke?adId=${ad.id}`} className="w-full h-14 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs hover:bg-white/5 transition-all">
                     <MessageCircle className="w-4 h-4" /> Poruka prodavcu
                   </Link>
                 )}
@@ -4658,11 +4634,7 @@ const LegalPage: React.FC<{ title: string; content: React.ReactNode }> = ({ titl
 const Footer = () => (
   <footer className="flex-shrink-0 pt-3 pb-14 px-3 lg:py-6 lg:px-4 lg:pb-6 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
     <div className="flex flex-col items-center gap-1 lg:gap-2">
-      <LogoSymbol type={1} className="w-8 h-8 lg:w-12 lg:h-12" />
-      <div className="text-center">
-        <div className="text-base lg:text-2xl font-bold tracking-tighter" style={{ color: 'var(--text-primary)' }}>Poveži.ME</div>
-        <div className="text-[8px] lg:text-[9px] font-black uppercase tracking-[0.2em] lg:tracking-[0.25em] mt-0.5" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</div>
-      </div>
+      <img src="/logo-full.png" alt="Poveži.ME" className="h-10 lg:h-14 w-auto object-contain" />
     </div>
     <nav className="flex flex-wrap justify-center gap-2 lg:gap-3 mt-2 lg:mt-3">
       <Link to="/pravila" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>
