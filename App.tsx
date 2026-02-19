@@ -991,7 +991,7 @@ const Marketplace: React.FC<{
 
   // Kad VirtualList koristi initialScrollOffset, odmah clear refs i storage.
   useEffect(() => {
-    if (!savedScrollForRestore?.virtualOffset || !useVirtualList) return;
+    if (!savedScrollForRestore?.virtualOffset) return;
     pendingListScrollRef.current = null;
     pendingScrollYRef.current = null;
     const listKey = listKeyRef.current || getListRouteKey(location.pathname, location.search);
@@ -1002,7 +1002,7 @@ const Marketplace: React.FC<{
       } catch {}
     }, 300);
     return () => clearTimeout(t);
-  }, [savedScrollForRestore?.virtualOffset, useVirtualList, location.pathname, location.search]);
+  }, [savedScrollForRestore?.virtualOffset, location.pathname, location.search]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
