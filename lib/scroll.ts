@@ -97,13 +97,16 @@ export function isDetailRoute(pathname: string): boolean {
 
 /**
  * Spremi scroll poziciju prije navigacije sa liste u detail.
- * Opciono: virtualOffset za VirtualList (marketplace).
+ * Jedan scroll owner: VirtualList ILI root.
+ * - virtualOffset > 0: VirtualList režim -> spremi { y: 0, l: offset }. Restore samo list.
+ * - inače: root režim -> spremi { y: rootScrollTop, l: 0 }. Restore samo root.
  */
 export function saveScrollForList(listRouteKey: string, virtualOffset?: number): void {
   if (typeof sessionStorage === 'undefined') return;
   try {
-    const y = getScrollTop();
-    const payload = virtualOffset != null ? JSON.stringify({ y: Math.round(y), l: Math.round(virtualOffset) }) : String(Math.round(y));
+    const payload = virtualOffset != null && virtualOffset > 0
+      ? JSON.stringify({ y: 0, l: Math.round(virtualOffset) })
+      : JSON.stringify({ y: Math.round(getScrollTop()), l: 0 });
     sessionStorage.setItem(SCROLL_LIST_PREFIX + listRouteKey, payload);
   } catch (_) {}
 }

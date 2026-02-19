@@ -506,6 +506,8 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
+    if (isDetailRoute(location.pathname)) return;
+    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1') return;
     const q = getAdsQueryFromLocation(location);
     fetchAdsFirstPage(q);
   }, [location.pathname, location.search]);
@@ -822,23 +824,40 @@ const Marketplace: React.FC<{
   const virtualListScrollRef = useRef(0);
 
   const listKeyRef = useRef<string>('');
-  // Pri mountu: pročitaj spremljenu scroll poziciju SAMO kad se vraćaš sa detail-a
+  const lastRestoredYRef = useRef<number | null>(null);
+  const lastRestoredListOffsetRef = useRef<number | null>(null);
+  const stabilizerTimeoutsRef = useRef<number[]>([]);
+  /** Dev: detekcija VirtualList onScroll(0) odmah nakon restore-a (list reset) */
+  const justRestoredListOffsetRef = useRef<number | null>(null);
+  // Pri mountu / nakon back: pročitaj spremljenu scroll SAMO kad se vraćaš sa detail-a
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isDetailRoute(location.pathname)) return;
-    if (sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) !== '1') return;
+    const hasFlag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY) === '1';
+    if (import.meta.env?.DEV) console.log('[Marketplace] load effect', { hasFlag, pathname: location.pathname, search: location.search, key: location.key });
+    if (!hasFlag) return;
     try {
       const listKey = getListRouteKey(location.pathname, location.search);
       listKeyRef.current = listKey;
       const saved = loadScrollForList(listKey);
+      if (import.meta.env?.DEV) console.log('[Marketplace] saved scroll', saved ? { y: saved.y, virtualOffset: saved.virtualOffset } : null);
       if (!saved) return;
-      pendingScrollYRef.current = saved.y;
-      if (saved.virtualOffset != null) pendingListScrollRef.current = saved.virtualOffset;
+      // Jedan scroll owner: VirtualList ILI root (dual restore zabranjen)
+      if (saved.virtualOffset != null && saved.virtualOffset > 0) {
+        pendingListScrollRef.current = saved.virtualOffset;
+        pendingScrollYRef.current = null;
+      } else if (saved.y > 0) {
+        pendingScrollYRef.current = saved.y;
+        pendingListScrollRef.current = null;
+      } else {
+        pendingScrollYRef.current = null;
+        pendingListScrollRef.current = null;
+      }
       if (saved.y > 0 || (saved.virtualOffset != null && saved.virtualOffset > 0)) {
         if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       }
     } catch (_) { /* sessionStorage može biti onemogućen */ }
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, location.key]);
 
   // Vrati scroll nakon što se lista renderuje. SAMO kad su oglasi učitani (!adsLoading).
   // Ako restore na skeleton, render ga pregazi. clearListScroll tek nakon uspješnog restore-a.
@@ -854,9 +873,11 @@ const Marketplace: React.FC<{
 
     const applyWindow = (): boolean => {
       try {
-        if (pendingScrollYRef.current == null || windowRestored) return windowRestored;
+        // VirtualList aktivan: ne diraj root.scrollTop (jedan scroll owner)
+        if (pendingListScrollRef.current != null || pendingScrollYRef.current == null || windowRestored) return windowRestored;
         const savedY = pendingScrollYRef.current;
-        const scrollEl = getScrollRoot();
+        const root1 = getScrollRoot();
+        const scrollEl = root1;
         const maxScroll = scrollEl && scrollEl !== window
           ? (scrollEl as HTMLElement).scrollHeight - (scrollEl as HTMLElement).clientHeight
           : document.documentElement.scrollHeight - window.innerHeight;
@@ -867,8 +888,15 @@ const Marketplace: React.FC<{
           ? (scrollEl as HTMLElement).scrollTop
           : (typeof window !== 'undefined' ? window.scrollY : 0);
         if (Math.abs(currentTop - y) <= 2) {
+          if (import.meta.env?.DEV) console.log('[Marketplace] restore scroll y=', y);
+          lastRestoredYRef.current = y;
           windowRestored = true;
           pendingScrollYRef.current = null;
+          if (import.meta.env?.DEV) setTimeout(() => {
+            const root2 = getScrollRoot();
+            const st = root2 && root2 !== window ? (root2 as HTMLElement).scrollTop : window.scrollY;
+            console.log('[Marketplace] root same?', root1 === root2, root1, root2, 'scrollTop', st);
+          }, 50);
           return true;
         }
       } catch (_) {}
@@ -881,12 +909,34 @@ const Marketplace: React.FC<{
         const list = virtualListRef.current;
         if (!list || typeof list.scrollTo !== 'function') return false;
         const offset = Math.max(0, pendingListScrollRef.current);
+        if (import.meta.env?.DEV) console.log('[Marketplace] restore list savedVirtualOffset=', offset, 'appliedOffset=', offset);
+        lastRestoredListOffsetRef.current = offset;
+        justRestoredListOffsetRef.current = offset;
         list.scrollTo(offset);
         listRestored = true;
         pendingListScrollRef.current = null;
+        if (import.meta.env?.DEV) setTimeout(() => { justRestoredListOffsetRef.current = null; }, 500);
         return true;
       } catch (_) {}
       return false;
+    };
+
+    const stabilizer = (savedY: number | null, listOffset: number | null) => {
+      if (typeof window === 'undefined') return;
+      try {
+        if (savedY != null) {
+          const scrollEl = getScrollRoot();
+          const currentTop = scrollEl && scrollEl !== window ? (scrollEl as HTMLElement).scrollTop : window.scrollY;
+          if (currentTop < savedY - 50) {
+            restoreScroll(savedY);
+            if (import.meta.env?.DEV) console.log('[Marketplace] stabilizer re-applied y=', savedY);
+          }
+        }
+        if (listOffset != null) {
+          const list = virtualListRef.current;
+          if (list?.scrollTo) list.scrollTo(listOffset);
+        }
+      } catch (_) {}
     };
 
     const run = () => {
@@ -895,11 +945,34 @@ const Marketplace: React.FC<{
       const key = listKeyRef.current;
       const bothDone = pendingScrollYRef.current == null && pendingListScrollRef.current == null;
       if (bothDone && key && (okW || okL)) {
+        if (import.meta.env?.DEV) console.log('[Marketplace] restore applied', { okW, okL, key });
         try { sessionStorage.removeItem(RETURN_TO_MARKETPLACE_KEY); } catch {}
         clearListScroll(key);
         listKeyRef.current = '';
+        const sy = lastRestoredYRef.current;
+        const lo = lastRestoredListOffsetRef.current;
+        stabilizerTimeoutsRef.current.push(
+          window.setTimeout(() => stabilizer(sy, lo), 300),
+          window.setTimeout(() => {
+            stabilizer(sy, lo);
+            lastRestoredYRef.current = null;
+            lastRestoredListOffsetRef.current = null;
+          }, 900)
+        );
       }
     };
+
+    const savedYForWarn = pendingScrollYRef.current ?? lastRestoredYRef.current ?? 0;
+    if (savedYForWarn > 0) {
+      stabilizerTimeoutsRef.current.push(window.setTimeout(() => {
+        const flag = sessionStorage.getItem(RETURN_TO_MARKETPLACE_KEY);
+        const root = getScrollRoot();
+        const rootTop = root && root !== window ? (root as HTMLElement).scrollTop : window.scrollY;
+        if (flag === '1' || (Math.abs(rootTop) < 5 && savedYForWarn > 50)) {
+          console.warn('RESTORE FAILED: root replaced or list reset', { savedY: savedYForWarn, rootScrollTop: rootTop });
+        }
+      }, 1200));
+    }
 
     const raf = requestAnimationFrame(() => requestAnimationFrame(run));
     const t0 = setTimeout(run, 100);
@@ -916,8 +989,10 @@ const Marketplace: React.FC<{
       clearTimeout(t3);
       clearTimeout(t4);
       clearTimeout(t5);
+      stabilizerTimeoutsRef.current.forEach(clearTimeout);
+      stabilizerTimeoutsRef.current = [];
     };
-  }, [adsLoading, ads.length]);
+  }, [adsLoading, ads.length, location.key]);
 
   // Spremi scroll poziciju na scroll event (scroll root ili window + VirtualList)
   useEffect(() => {
@@ -1464,7 +1539,12 @@ const Marketplace: React.FC<{
                 itemSize={dynamicRowHeight}
                 overscanCount={VIRTUAL_OVERSCAN}
                 style={{ overflowX: 'hidden' }}
-                onScroll={({ scrollOffset }) => { virtualListScrollRef.current = scrollOffset; }}
+                onScroll={({ scrollOffset }) => {
+                  virtualListScrollRef.current = scrollOffset;
+                  if (import.meta.env?.DEV && justRestoredListOffsetRef.current != null && scrollOffset < 5 && justRestoredListOffsetRef.current > 50) {
+                    console.warn('[VirtualList] onScroll(0) odmah nakon restore-a – list reset? savedOffset=', justRestoredListOffsetRef.current);
+                  }
+                }}
               >
                 {({ index, style }) => {
                   const t0 = typeof performance !== 'undefined' && (import.meta as any).env?.DEV ? performance.now() : 0;
@@ -2142,11 +2222,22 @@ export const AdDetailView: React.FC<{
       )
     : null;
 
+  const handleBack = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      if (import.meta.env?.DEV) console.log('[AdDetailView] back: navigate(-1)');
+      navigate(-1);
+    } else {
+      const fallback = isAdminPreview && adminActions ? adminActions.backHref : '/marketplace';
+      if (import.meta.env?.DEV) console.log('[AdDetailView] back: fallback navigate(', fallback, ')');
+      navigate(fallback);
+    }
+  }, [navigate, isAdminPreview, adminActions]);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 lg:py-12 animate-slide-up">
-      {isAdminPreview && adminActions && (
+      {isAdminPreview && adminActions ? (
         <div className="flex flex-wrap items-center gap-4 mb-6 p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }}>
-          <Link to={adminActions.backHref} className="p-2 rounded-lg border flex items-center gap-2 font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}><ChevronLeft className="w-5 h-5" /> Nazad</Link>
+          <button type="button" onClick={handleBack} className="p-2 rounded-lg border flex items-center gap-2 font-bold uppercase text-[10px]" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}><ChevronLeft className="w-5 h-5" /> Nazad</button>
           <span className="px-2 py-1 rounded text-xs font-bold uppercase" style={{ backgroundColor: ad.status === 'NA_CEKANJU' ? 'rgba(59, 130, 246, 0.2)' : 'var(--bg-card)', color: 'var(--text-primary)' }}>Pregled oglasa (admin){ad.status !== 'AKTIVAN' ? ` · ${ad.status}` : ''}</span>
           {ad.status === 'NA_CEKANJU' && (
             <>
@@ -2154,6 +2245,10 @@ export const AdDetailView: React.FC<{
               <button type="button" onClick={adminActions.onReject} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase border border-red-500/50 text-red-400">Odbij (obriši)</button>
             </>
           )}
+        </div>
+      ) : (
+        <div className="mb-6">
+          <button type="button" onClick={handleBack} className="p-2 rounded-lg border flex items-center gap-2 font-bold uppercase text-[10px] w-fit" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}><ChevronLeft className="w-5 h-5" /> Nazad na oglase</button>
         </div>
       )}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -2446,11 +2541,21 @@ const AdDetail: React.FC<{
   const safeVlasnikId = ad?.vlasnikId != null ? String(ad.vlasnikId) : '';
 
   if (adFromApi === undefined && !ad) return <div className="max-w-6xl mx-auto px-4 py-20"><div className="aspect-video bg-[#131C2B] rounded-xl animate-pulse" /><div className="h-8 bg-[#131C2B] rounded-lg w-3/4 mt-6 animate-pulse" /></div>;
+  const handleBackFromDetail = useCallback(() => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      if (import.meta.env?.DEV) console.log('[AdDetail] back: navigate(-1)');
+      navigate(-1);
+    } else {
+      if (import.meta.env?.DEV) console.log('[AdDetail] back: fallback navigate(/marketplace)');
+      navigate('/marketplace');
+    }
+  }, [navigate]);
+
   if (!ad) return (
     <div className="max-w-6xl mx-auto px-4 py-20 text-center">
       <p className="font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-secondary)' }}>Oglas nije pronađen</p>
       {fetchError && <button type="button" onClick={loadAd} className="px-4 py-2 rounded-xl text-sm font-bold uppercase" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Pokušaj ponovo</button>}
-      <p className="mt-4"><Link to="/marketplace" className="text-sm font-bold" style={{ color: 'var(--accent)' }}>← Nazad na oglase</Link></p>
+      <p className="mt-4"><button type="button" onClick={handleBackFromDetail} className="text-sm font-bold" style={{ color: 'var(--accent)' }}>← Nazad na oglase</button></p>
     </div>
   );
 
