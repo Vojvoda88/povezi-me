@@ -193,6 +193,91 @@ export const NAMJESTAJ_TIP = [
 /** Materijal za Namještaj */
 export const NAMJESTAJ_MATERIJAL = ['Drvo', 'Metal', 'Plastika', 'Kombinacija'];
 
+/** Tip za Poljoprivreda */
+export const POLJOPRIVREDA_TIP = [
+  { id: 'traktori', name: 'Traktori i oprema' },
+  { id: 'sjeme', name: 'Sjeme' },
+  { id: 'dubrivo', name: 'Đubrivo' },
+  { id: 'stocna_hrana', name: 'Stočna hrana' },
+  { id: 'alati', name: 'Alati' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Tip za Tehnika (elektronika) */
+export const TEHNIKA_TIP = [
+  { id: 'racunari', name: 'Računari' },
+  { id: 'laptopi', name: 'Laptopi' },
+  { id: 'telefoni', name: 'Telefoni' },
+  { id: 'tableti', name: 'Tableti' },
+  { id: 'tv', name: 'TV' },
+  { id: 'audio', name: 'Audio' },
+  { id: 'gaming', name: 'Gaming' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Vrsta za Kućni ljubimci */
+export const KUCNI_LJUBIMCI_VRSTA = [
+  { id: 'pas', name: 'Pas' },
+  { id: 'macka', name: 'Mačka' },
+  { id: 'ptice', name: 'Ptice' },
+  { id: 'ribe', name: 'Ribe' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Tip za Moda */
+export const MODA_TIP = [
+  { id: 'odjeca', name: 'Odjeća' },
+  { id: 'obuca', name: 'Obuća' },
+  { id: 'torbe', name: 'Torbe' },
+  { id: 'nakit', name: 'Nakit' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Veličina za Moda */
+export const MODA_VELICINE = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+/** Tip za Poslovi */
+export const POSLOVI_TIP = [
+  { id: 'full_time', name: 'Full-time' },
+  { id: 'part_time', name: 'Part-time' },
+  { id: 'freelance', name: 'Freelance' },
+  { id: 'praksa', name: 'Praksa' },
+];
+
+/** Tip za Sport i rekreacija */
+export const SPORT_TIP = [
+  { id: 'fitness', name: 'Fitness' },
+  { id: 'bicikli', name: 'Bicikli' },
+  { id: 'skijanje', name: 'Skijanje' },
+  { id: 'camping', name: 'Camping' },
+  { id: 'vodeni', name: 'Vodeni sportovi' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Tip za Građevina i alati */
+export const GRADJEVINA_TIP = [
+  { id: 'materijali', name: 'Materijali' },
+  { id: 'alati', name: 'Alati' },
+  { id: 'strojevi', name: 'Strojevi' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Tip za Pokloni i cvijeće */
+export const POKLONI_TIP = [
+  { id: 'poklon', name: 'Poklon' },
+  { id: 'cvijece', name: 'Cvijeće' },
+  { id: 'torte', name: 'Torte' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Povod za Pokloni */
+export const POKLONI_POVOD = [
+  { id: 'rodjendan', name: 'Rođendan' },
+  { id: 'vjencanje', name: 'Vjenčanje' },
+  { id: 'sahrana', name: 'Sahrana' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
 export const MOTO_CATALOG: Record<string, string[]> = {
   "Honda": ["Africa Twin", "CB 500F", "CBR 600RR", "X-ADV", "Hornet", "PCX 125"],
   "Yamaha": ["MT-07", "MT-09", "TMAX 560", "R1", "Tracer 9", "XMAX 300"],

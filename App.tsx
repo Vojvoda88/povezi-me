@@ -39,7 +39,9 @@ import {
   MOTORNA_VOZILA_ID, MOTORNA_VOZILA_SUBCATEGORIES,
   AUTO_DIJELOVI_TIP, ZA_DJECU_TIP, ZA_DJECU_UZRAST,
   USLUGE_NACIN_NAPLATE, BIJELA_TEHNIKA_TIP, BIJELA_TEHNIKA_ENERGIJA,
-  NAMJESTAJ_TIP, NAMJESTAJ_MATERIJAL
+  NAMJESTAJ_TIP, NAMJESTAJ_MATERIJAL, POLJOPRIVREDA_TIP, TEHNIKA_TIP,
+  KUCNI_LJUBIMCI_VRSTA, MODA_TIP, MODA_VELICINE, POSLOVI_TIP, SPORT_TIP,
+  GRADJEVINA_TIP, POKLONI_TIP, POKLONI_POVOD
 } from './constants';
 import { AUTOMOTIVE_CATALOG } from './automotiveCatalog';
 import { getFallbackMakeItems, getFallbackModelItems, hasFallbackCatalog } from './vehicleFallbackCatalogs';
@@ -142,9 +144,19 @@ const DEFAULT_FILTERS = {
   materijal: '',
   tipZaDjecu: '',
   uzrast: '',
+  tipPoljoprivreda: '',
+  tipTehnika: '',
+  vrstaKucni: '',
+  tipModa: '',
+  velicinaModa: '',
+  tipPoslovi: '',
+  tipSport: '',
+  tipGradjevina: '',
+  tipPokloni: '',
+  povodPokloni: '',
 };
 
-const CATEGORIES_WITH_FILTER_PANEL = ['nekretnine', 'auto_dijelovi', 'usluge', 'bijela_tehnika', 'namjestaj', 'za_djecu'];
+const CATEGORIES_WITH_FILTER_PANEL = ['nekretnine', 'auto_dijelovi', 'usluge', 'bijela_tehnika', 'namjestaj', 'za_djecu', 'poljoprivreda', 'tehnika', 'kucni_ljubimci', 'moda', 'poslovi', 'sport', 'gradjevina', 'pokloni_cvijece'];
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Najnoviji (istaknuti prvo)' },
@@ -1252,6 +1264,14 @@ const Marketplace: React.FC<{
       bijela_tehnika: ['tipBijela', 'energetskaKlasa', 'stanje'],
       namjestaj: ['tipNamjestaj', 'materijal', 'stanje'],
       za_djecu: ['tipZaDjecu', 'uzrast', 'stanje'],
+      poljoprivreda: ['tipPoljoprivreda'],
+      tehnika: ['tipTehnika', 'stanje'],
+      kucni_ljubimci: ['vrstaKucni'],
+      moda: ['tipModa', 'velicinaModa', 'stanje'],
+      poslovi: ['tipPoslovi'],
+      sport: ['tipSport', 'stanje'],
+      gradjevina: ['tipGradjevina', 'stanje'],
+      pokloni_cvijece: ['tipPokloni', 'povodPokloni'],
     };
     const extra = (cat && catFilterKeys[cat]) ? catFilterKeys[cat].filter(k => filters[k]).length : 0;
     return common + extra;
@@ -1397,6 +1417,36 @@ const Marketplace: React.FC<{
       if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
       if (filters.tipZaDjecu) result = result.filter(ad => (ad as any).details?.tip === filters.tipZaDjecu);
       if (filters.uzrast) result = result.filter(ad => (ad as any).details?.uzrast === filters.uzrast);
+    }
+    if (activeCategory?.id === 'poljoprivreda' && filters.tipPoljoprivreda) {
+      result = result.filter(ad => (ad as any).details?.tip === filters.tipPoljoprivreda);
+    }
+    if (activeCategory?.id === 'tehnika') {
+      if (filters.tipTehnika) result = result.filter(ad => (ad as any).details?.tip === filters.tipTehnika);
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+    }
+    if (activeCategory?.id === 'kucni_ljubimci') {
+      if (filters.vrstaKucni) result = result.filter(ad => (ad as any).details?.vrsta === filters.vrstaKucni);
+    }
+    if (activeCategory?.id === 'moda') {
+      if (filters.tipModa) result = result.filter(ad => (ad as any).details?.tip === filters.tipModa);
+      if (filters.velicinaModa) result = result.filter(ad => (ad as any).details?.velicina === filters.velicinaModa);
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+    }
+    if (activeCategory?.id === 'poslovi' && filters.tipPoslovi) {
+      result = result.filter(ad => (ad as any).details?.tip === filters.tipPoslovi);
+    }
+    if (activeCategory?.id === 'sport') {
+      if (filters.tipSport) result = result.filter(ad => (ad as any).details?.tip === filters.tipSport);
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+    }
+    if (activeCategory?.id === 'gradjevina') {
+      if (filters.tipGradjevina) result = result.filter(ad => (ad as any).details?.tip === filters.tipGradjevina);
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+    }
+    if (activeCategory?.id === 'pokloni_cvijece') {
+      if (filters.tipPokloni) result = result.filter(ad => (ad as any).details?.tip === filters.tipPokloni);
+      if (filters.povodPokloni) result = result.filter(ad => (ad as any).details?.povod === filters.povodPokloni);
     }
 
     const sortOrder = searchParams.get('sort') || '';
@@ -2358,6 +2408,146 @@ const FilterPanel: React.FC<{ category: string, initialFilters: any, onApply: (f
           </>
         )}
 
+        {/* POLJOPRIVREDA */}
+        {category === 'poljoprivreda' && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+            <select value={localFilters.tipPoljoprivreda || ''} onChange={e => setLocalFilters({...localFilters, tipPoljoprivreda: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+              <option value="">Sve</option>
+              {POLJOPRIVREDA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* TEHNIKA */}
+        {category === 'tehnika' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipTehnika || ''} onChange={e => setLocalFilters({...localFilters, tipTehnika: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {TEHNIKA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* KUĆNI LJUBIMCI */}
+        {category === 'kucni_ljubimci' && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Vrsta</label>
+            <select value={localFilters.vrstaKucni || ''} onChange={e => setLocalFilters({...localFilters, vrstaKucni: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+              <option value="">Sve</option>
+              {KUCNI_LJUBIMCI_VRSTA.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* MODA */}
+        {category === 'moda' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipModa || ''} onChange={e => setLocalFilters({...localFilters, tipModa: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {MODA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Veličina</label>
+              <select value={localFilters.velicinaModa || ''} onChange={e => setLocalFilters({...localFilters, velicinaModa: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {MODA_VELICINE.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* POSLOVI */}
+        {category === 'poslovi' && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip posla</label>
+            <select value={localFilters.tipPoslovi || ''} onChange={e => setLocalFilters({...localFilters, tipPoslovi: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+              <option value="">Sve</option>
+              {POSLOVI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* SPORT */}
+        {category === 'sport' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipSport || ''} onChange={e => setLocalFilters({...localFilters, tipSport: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {SPORT_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* GRAĐEVINA */}
+        {category === 'gradjevina' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipGradjevina || ''} onChange={e => setLocalFilters({...localFilters, tipGradjevina: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {GRADJEVINA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* POKLONI I CVIJEĆE */}
+        {category === 'pokloni_cvijece' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipPokloni || ''} onChange={e => setLocalFilters({...localFilters, tipPokloni: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {POKLONI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Povod</label>
+              <select value={localFilters.povodPokloni || ''} onChange={e => setLocalFilters({...localFilters, povodPokloni: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {POKLONI_POVOD.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
         {/* DINAMIČKA POLJA (vozila i ostalo) */}
         {fields && category !== 'nekretnine' && !CATEGORIES_WITH_FILTER_PANEL.includes(category) && Object.entries(fields).map(([key, config]) => renderField(key, config))}
       </div>
@@ -2550,8 +2740,19 @@ const SpecGrid = ({ details }: { details: any }) => {
   if (details.pogon) specs.push({ label: 'Pogon', value: details.pogon });
   if (details.stanje) specs.push({ label: 'Stanje', value: details.stanje });
   if (details.tip) {
-    const tipLabel = BIJELA_TEHNIKA_TIP.find(t => t.id === details.tip)?.name || NAMJESTAJ_TIP.find(t => t.id === details.tip)?.name || ZA_DJECU_TIP.find(t => t.id === details.tip)?.name || details.tip;
+    const tipLabel = BIJELA_TEHNIKA_TIP.find(t => t.id === details.tip)?.name || NAMJESTAJ_TIP.find(t => t.id === details.tip)?.name || ZA_DJECU_TIP.find(t => t.id === details.tip)?.name
+      || POLJOPRIVREDA_TIP.find(t => t.id === details.tip)?.name || TEHNIKA_TIP.find(t => t.id === details.tip)?.name || MODA_TIP.find(t => t.id === details.tip)?.name
+      || POSLOVI_TIP.find(t => t.id === details.tip)?.name || SPORT_TIP.find(t => t.id === details.tip)?.name || GRADJEVINA_TIP.find(t => t.id === details.tip)?.name
+      || POKLONI_TIP.find(t => t.id === details.tip)?.name || details.tip;
     specs.push({ label: 'Tip', value: tipLabel });
+  }
+  if (details.vrsta) {
+    const vrstaLabel = KUCNI_LJUBIMCI_VRSTA.find(t => t.id === details.vrsta)?.name || details.vrsta;
+    specs.push({ label: 'Vrsta', value: vrstaLabel });
+  }
+  if (details.povod) {
+    const povodLabel = POKLONI_POVOD.find(p => p.id === details.povod)?.name || details.povod;
+    specs.push({ label: 'Povod', value: povodLabel });
   }
   if (details.tipDijela) specs.push({ label: 'Tip dijela', value: AUTO_DIJELOVI_TIP.find(t => t.id === details.tipDijela)?.name || details.tipDijela });
   if (details.nacinNaplate) specs.push({ label: 'Način naplate', value: USLUGE_NACIN_NAPLATE.find(t => t.id === details.nacinNaplate)?.name || details.nacinNaplate });
@@ -3665,7 +3866,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
     premium: false, instagram: '', facebook: '', viber: '', whatsapp: '',
     tipOglasa: 'prodajem',
     realEstateDetails: { tipNekretnine: '', tipPonude: 'prodaja', kvadratura: '', brojSoba: '', sprat: '' },
-    details: { stanje: 'Polovno', tipDijela: '', nacinNaplate: '', tipBijela: '', energetskaKlasa: '', tipNamjestaj: '', materijal: '', tipZaDjecu: '', uzrast: '', velicina: '' },
+    details: { stanje: 'Polovno', tipDijela: '', nacinNaplate: '', tipBijela: '', energetskaKlasa: '', tipNamjestaj: '', materijal: '', tipZaDjecu: '', uzrast: '', velicina: '', tipPoljoprivreda: '', tipTehnika: '', vrstaKucni: '', tipModa: '', velicinaModa: '', tipPoslovi: '', tipSport: '', tipGradjevina: '', tipPokloni: '', povodPokloni: '' },
     vehicleDetails: {},
     carDetails: { marka: '', model: '', godiste: '', kilometraza: '', gorivo: '', mjenjac: '', karoserija: '', pogon: '', snaga: '', kubikaza: '', stanje: 'Polovno' },
     motoDetails: { marka: '', model: '', godiste: '', kilometraza: '', kubikaza: '', gorivo: '', mjenjac: '', tip: '', snagaKW: '', stanje: 'Polovno' }
@@ -3894,6 +4095,29 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       if (formData.details?.tipZaDjecu) baseDetails.tip = formData.details.tipZaDjecu;
       if (formData.details?.uzrast) baseDetails.uzrast = formData.details.uzrast;
       if (formData.details?.velicina) baseDetails.velicina = formData.details.velicina;
+    } else if (category === 'poljoprivreda' && formData.details?.tipPoljoprivreda) {
+      baseDetails = { tip: formData.details.tipPoljoprivreda };
+    } else if (category === 'tehnika') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipTehnika) baseDetails.tip = formData.details.tipTehnika;
+    } else if (category === 'kucni_ljubimci' && formData.details?.vrstaKucni) {
+      baseDetails = { vrsta: formData.details.vrstaKucni };
+    } else if (category === 'moda') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipModa) baseDetails.tip = formData.details.tipModa;
+      if (formData.details?.velicinaModa) baseDetails.velicina = formData.details.velicinaModa;
+    } else if (category === 'poslovi' && formData.details?.tipPoslovi) {
+      baseDetails = { tip: formData.details.tipPoslovi };
+    } else if (category === 'sport') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipSport) baseDetails.tip = formData.details.tipSport;
+    } else if (category === 'gradjevina') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipGradjevina) baseDetails.tip = formData.details.tipGradjevina;
+    } else if (category === 'pokloni_cvijece') {
+      baseDetails = {};
+      if (formData.details?.tipPokloni) baseDetails.tip = formData.details.tipPokloni;
+      if (formData.details?.povodPokloni) baseDetails.povod = formData.details.povodPokloni;
     }
     const contactDetails: Record<string, unknown> = { ...(baseDetails || {}) };
     contactDetails.imeProdavca = imePrezime;
@@ -4342,6 +4566,164 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
           </section>
         )}
 
+        {category === 'poljoprivreda' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Poljoprivreda</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipPoljoprivreda || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipPoljoprivreda: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {POLJOPRIVREDA_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'tehnika' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Tehnika</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipTehnika || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipTehnika: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {TEHNIKA_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'kucni_ljubimci' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Kućni ljubimci</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Vrsta</label>
+                <select value={formData.details?.vrstaKucni || ''} onChange={e => setFormData({...formData, details: {...formData.details, vrstaKucni: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {KUCNI_LJUBIMCI_VRSTA.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'moda' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Moda</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipModa || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipModa: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {MODA_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Veličina</label>
+                <select value={formData.details?.velicinaModa || ''} onChange={e => setFormData({...formData, details: {...formData.details, velicinaModa: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {MODA_VELICINE.map(v => (<option key={v} value={v}>{v}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'poslovi' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Poslovi</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipPoslovi || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipPoslovi: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {POSLOVI_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'sport' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Sport i rekreacija</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipSport || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipSport: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {SPORT_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'gradjevina' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Građevina i alati</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipGradjevina || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipGradjevina: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {GRADJEVINA_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'pokloni_cvijece' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Pokloni i cvijeće</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipPokloni || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipPokloni: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {POKLONI_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Povod</label>
+                <select value={formData.details?.povodPokloni || ''} onChange={e => setFormData({...formData, details: {...formData.details, povodPokloni: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {POKLONI_POVOD.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="bg-[#131C2B] border-2 rounded-xl shadow-2xl space-y-4 p-8" style={{ borderColor: 'rgba(79, 109, 255, 0.5)', boxShadow: '0 0 28px rgba(79, 109, 255, 0.2), 0 0 56px rgba(79, 109, 255, 0.1)' }}>
           <div className="flex items-center gap-2">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2" style={{ color: 'var(--accent)' }}><Zap className="w-4 h-4" style={{ color: 'var(--accent)' }} /> Istaknite oglas</h3>
@@ -4440,7 +4822,17 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
           materijal: d.materijal || '',
           tipZaDjecu: d.tip || '',
           uzrast: d.uzrast || '',
-          velicina: d.velicina || ''
+          velicina: d.velicina || '',
+          tipPoljoprivreda: d.tip || '',
+          tipTehnika: d.tip || '',
+          vrstaKucni: d.vrsta || '',
+          tipModa: d.tip || '',
+          velicinaModa: d.velicina || '',
+          tipPoslovi: d.tip || '',
+          tipSport: d.tip || '',
+          tipGradjevina: d.tip || '',
+          tipPokloni: d.tip || '',
+          povodPokloni: d.povod || ''
         };
         setFormData({
           naslov: mapped.naslov,
@@ -4561,6 +4953,29 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         if (formData.details?.tipZaDjecu) detailsPayload.tip = formData.details.tipZaDjecu;
         if (formData.details?.uzrast) detailsPayload.uzrast = formData.details.uzrast;
         if (formData.details?.velicina) detailsPayload.velicina = formData.details.velicina;
+      } else if (ad.kategorija === 'poljoprivreda' && formData.details?.tipPoljoprivreda) {
+        detailsPayload = { tip: formData.details.tipPoljoprivreda };
+      } else if (ad.kategorija === 'tehnika') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipTehnika) detailsPayload.tip = formData.details.tipTehnika;
+      } else if (ad.kategorija === 'kucni_ljubimci' && formData.details?.vrstaKucni) {
+        detailsPayload = { vrsta: formData.details.vrstaKucni };
+      } else if (ad.kategorija === 'moda') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipModa) detailsPayload.tip = formData.details.tipModa;
+        if (formData.details?.velicinaModa) detailsPayload.velicina = formData.details.velicinaModa;
+      } else if (ad.kategorija === 'poslovi' && formData.details?.tipPoslovi) {
+        detailsPayload = { tip: formData.details.tipPoslovi };
+      } else if (ad.kategorija === 'sport') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipSport) detailsPayload.tip = formData.details.tipSport;
+      } else if (ad.kategorija === 'gradjevina') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipGradjevina) detailsPayload.tip = formData.details.tipGradjevina;
+      } else if (ad.kategorija === 'pokloni_cvijece') {
+        detailsPayload = {};
+        if (formData.details?.tipPokloni) detailsPayload.tip = formData.details.tipPokloni;
+        if (formData.details?.povodPokloni) detailsPayload.povod = formData.details.povodPokloni;
       }
       const body: Record<string, unknown> = {
         naslov,
@@ -4720,6 +5135,76 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
               <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Uzrast</label><select value={formData.details?.uzrast || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, uzrast: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{ZA_DJECU_UZRAST.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
               <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Veličina</label><input type="text" value={formData.details?.velicina || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, velicina: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="npr. 86, S" /></div>
               <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'poljoprivreda' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Poljoprivreda</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipPoljoprivreda || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipPoljoprivreda: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{POLJOPRIVREDA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'tehnika' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Tehnika</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipTehnika || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipTehnika: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{TEHNIKA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'kucni_ljubimci' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Kućni ljubimci</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Vrsta</label><select value={formData.details?.vrstaKucni || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, vrstaKucni: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{KUCNI_LJUBIMCI_VRSTA.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'moda' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Moda</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipModa || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipModa: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{MODA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Veličina</label><select value={formData.details?.velicinaModa || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, velicinaModa: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{MODA_VELICINE.map(v => <option key={v} value={v}>{v}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'poslovi' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Poslovi</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipPoslovi || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipPoslovi: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{POSLOVI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'sport' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Sport i rekreacija</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipSport || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipSport: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{SPORT_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'gradjevina' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Građevina i alati</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipGradjevina || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipGradjevina: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{GRADJEVINA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'pokloni_cvijece' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Pokloni i cvijeće</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipPokloni || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipPokloni: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{POKLONI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Povod</label><select value={formData.details?.povodPokloni || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, povodPokloni: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{POKLONI_POVOD.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             </div>
           </section>
         )}
