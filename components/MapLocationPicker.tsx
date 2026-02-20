@@ -3,8 +3,10 @@ import { Search } from 'lucide-react';
 import { LOCATION_COORDS } from '../constants';
 
 /** Geocoding pomoću OpenStreetMap Nominatim (besplatno, bez API ključa). */
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  const q = encodeURIComponent(address.trim() + ', Crna Gora');
+async function geocodeAddress(address: string, city?: string): Promise<{ lat: number; lng: number } | null> {
+  const base = address.trim();
+  const suffix = city ? `, ${city}, Crna Gora` : ', Crna Gora';
+  const q = encodeURIComponent(base + suffix);
   const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
     headers: {
       Accept: 'application/json',
@@ -44,7 +46,7 @@ export const MapLocationPicker: React.FC<{
     setGeocodeError(null);
     setGeocodeLoading(true);
     try {
-      const coords = await geocodeAddress(q);
+      const coords = await geocodeAddress(q, lokacija);
       if (coords) {
         onChange(coords);
         if (mapRef.current) {
@@ -175,7 +177,7 @@ export const MapLocationPicker: React.FC<{
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Unesite adresu (npr. Njegoševa 12, Podgorica)..."
+          placeholder={`Unesite adresu u ${lokacija} (npr. Njegoševa 12)...`}
           value={addressQuery}
           onChange={(e) => {
             setAddressQuery(e.target.value);
@@ -197,7 +199,7 @@ export const MapLocationPicker: React.FC<{
         </button>
       </div>
       {geocodeError && <p className="text-xs text-amber-500">{geocodeError}</p>}
-      <p className="text-[10px] text-[#9CA3AF]">Unesite adresu da vam mapu prebaci na to mjesto, ili kliknite na mapu da postavite tačnu lokaciju.</p>
+      <p className="text-[10px] text-[#9CA3AF]">Pretraga ulica u {lokacija}. Unesite adresu da vam mapu prebaci na to mjesto, ili kliknite na mapu.</p>
       <div
         ref={containerRef}
         className="w-full rounded-xl overflow-hidden border cursor-crosshair"
