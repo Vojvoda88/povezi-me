@@ -4234,7 +4234,8 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         return;
       }
       onSaved?.();
-      navigate('/moji-oglasi');
+      const needsReview = data?.status === 'NA_CEKANJU';
+      navigate(needsReview ? '/moji-oglasi?pending=1' : '/moji-oglasi');
     } catch {
       setSubmitError('Greška u mreži.');
     } finally {
@@ -4321,6 +4322,7 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
             <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL virtualne ture (Matterport, 360°)</label><input type="url" value={formData.realEstateDetails?.virtualTourUrl || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, virtualTourUrl: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="https://my.matterport.com/..." /></div>
           </section>
         )}
+        <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Izmjene će biti pregledane od administratora prije nego oglas ponovo postane aktivan na sajtu.</p>
         <button type="submit" disabled={submitLoading} className="w-full h-14 bg-[#4F6DFF] text-white rounded-2xl font-black uppercase text-xs tracking-widest disabled:opacity-70 flex items-center justify-center gap-2">
           {submitLoading ? <><Loader2 className="w-5 h-5 animate-spin" /> Snimanje...</> : 'Sačuvaj izmjene'}
         </button>

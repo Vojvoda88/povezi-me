@@ -527,6 +527,26 @@ router.patch('/my/:id', authenticate as any, (async (req: Request, res: Response
         : undefined;
     }
 
+    const hasContentChanges =
+      validated.naslov !== undefined ||
+      validated.opis !== undefined ||
+      validated.images !== undefined ||
+      validated.details !== undefined ||
+      validated.cijena !== undefined ||
+      validated.lokacija !== undefined ||
+      validated.tipOglasa !== undefined ||
+      validated.make !== undefined ||
+      validated.model !== undefined ||
+      validated.vehicleSpecs !== undefined ||
+      validated.potkategorija !== undefined;
+    if (
+      validated.status === undefined &&
+      hasContentChanges &&
+      ad.status === AdStatus.AKTIVAN
+    ) {
+      (data as Record<string, unknown>).status = AdStatus.NA_CEKANJU;
+    }
+
     if (validated.images !== undefined) {
       const existing = ad.images as { id: string; url: string; thumbUrl?: string | null }[];
       const newUrls = new Set(validated.images.map((img) => String(img.url)));
