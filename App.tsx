@@ -1277,36 +1277,26 @@ const Marketplace: React.FC<{
           )}
         </div>
 
-      {/* Podkategorije za Motorna vozila (selector) */}
+      {/* Podkategorije za Motorna vozila – padajući meni (kompaktno na mobilu) */}
       {isMotornaVozila && (
-        <div className="flex flex-wrap gap-2 px-4 pb-2 items-center">
-          <button
-            type="button"
-            onClick={() => {
+        <div className="px-4 pb-2">
+          <select
+            value={selectedVehicleSubcategory || ''}
+            onChange={(e) => {
               const next = new URLSearchParams(searchParams);
-              next.delete('subcategory');
+              const v = e.target.value;
+              if (v) next.set('subcategory', v); else next.delete('subcategory');
+              next.set('page', '1');
               setSearchParams(next);
             }}
-            className="flex-shrink-0 px-4 py-2 rounded-full font-bold uppercase text-[9px] border transition-all"
-            style={!selectedVehicleSubcategory ? { background: 'var(--accent)', borderColor: 'transparent', color: 'white' } : { backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
+            className="w-full max-w-[280px] h-10 px-4 rounded-xl text-sm font-medium border outline-none focus:ring-2 focus:ring-[#4F6DFF]/50 transition-all cursor-pointer"
+            style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
           >
-            Sve
-          </button>
-          {MOTORNA_VOZILA_SUBCATEGORIES.map(sub => (
-            <button
-              key={sub.id}
-              type="button"
-              onClick={() => {
-                const next = new URLSearchParams(searchParams);
-                next.set('subcategory', sub.id);
-                setSearchParams(next);
-              }}
-              className="flex-shrink-0 px-4 py-2 rounded-full font-bold uppercase text-[9px] border transition-all"
-              style={selectedVehicleSubcategory === sub.id ? { background: 'var(--accent)', borderColor: 'transparent', color: 'white' } : { backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
-            >
-              {sub.name}
-            </button>
-          ))}
+            <option value="">Sve podkategorije</option>
+            {MOTORNA_VOZILA_SUBCATEGORIES.map(sub => (
+              <option key={sub.id} value={sub.id}>{sub.name}</option>
+            ))}
+          </select>
         </div>
       )}
 
