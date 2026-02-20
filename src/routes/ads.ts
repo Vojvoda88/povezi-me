@@ -757,28 +757,49 @@ router.post('/:id/extend', authenticate as any, (async (req: Request, res: Respo
   }
 }) as any);
 
+/** Sigurna konverzija u number – Prisma Decimal i edge cases. */
+function safeNum(v: unknown): number {
+  if (v == null) return 0;
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  const n = Number(typeof v === 'object' && v !== null && 'toString' in v ? (v as any).toString() : v);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/** Sigurna konverzija datuma u ISO string. */
+function safeDate(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString();
+  return null;
+}
+
 /** Serijalizuje listing ad (LISTING_SELECT) za JSON. */
 function serializeListingAd(ad: any) {
-  const img = Array.isArray(ad.images) && ad.images[0] ? ad.images[0] : null;
-  return {
-    id: ad.id,
-    slug: ad.slug,
-    naslov: ad.naslov,
-    cijena: Number(ad.cijena),
-    lokacija: ad.lokacija,
-    lat: ad.lat ?? null,
-    lng: ad.lng ?? null,
-    createdAt: ad.createdAt?.toISOString?.() ?? ad.createdAt ?? null,
-    featuredUntil: ad.featuredUntil?.toISOString?.() ?? ad.featuredUntil ?? null,
-    tipOglasa: ad.tipOglasa ?? null,
-    kategorija: ad.kategorija,
-    potkategorija: ad.potkategorija ?? null,
-    pogledi: ad.pogledi ?? 0,
-    details: ad.details ?? null,
-    vlasnikId: ad.vlasnikId,
-    images: img ? [{ url: img.url, thumbUrl: img.thumbUrl ?? null, width: img.width ?? null, height: img.height ?? null }] : [],
-    _count: ad._count ?? { favoritedBy: 0 },
-  };
+  try {
+    const img = Array.isArray(ad?.images) && ad.images[0] ? ad.images[0] : null;
+    return {
+      id: ad?.id ?? '',
+      slug: ad?.slug ?? '',
+      naslov: ad?.naslov ?? '',
+      cijena: safeNum(ad?.cijena),
+      lokacija: ad?.lokacija ?? '',
+      lat: ad?.lat ?? null,
+      lng: ad?.lng ?? null,
+      createdAt: safeDate(ad?.createdAt),
+      featuredUntil: safeDate(ad?.featuredUntil),
+      tipOglasa: ad?.tipOglasa ?? null,
+      kategorija: ad?.kategorija ?? '',
+      potkategorija: ad?.potkategorija ?? null,
+      pogledi: safeNum(ad?.pogledi),
+      details: ad?.details ?? null,
+      vlasnikId: ad?.vlasnikId ?? '',
+      images: img ? [{ url: img.url ?? '', thumbUrl: img.thumbUrl ?? null, width: img.width ?? null, height: img.height ?? null }] : [],
+      _count: ad?._count ?? { favoritedBy: 0 },
+    };
+  } catch (e) {
+    console.error('serializeListingAd error:', e);
+    return { id: ad?.id, slug: ad?.slug, naslov: ad?.naslov ?? '', cijena: 0, lokacija: '', images: [], _count: { favoritedBy: 0 } } as any;
+  }
 }
 
 /**
@@ -795,7 +816,7 @@ router.get('/similar/:slug', (async (req: Request, res: Response) => {
       select: { id: true, kategorija: true, potkategorija: true, cijena: true },
     });
     if (!source) return s.status(404).json({ error: 'Oglas nije pronađen' });
-    const price = Number(source.cijena);
+    const price = safeNum(source.cijena) || 1;
     const priceMin = Math.max(0, Math.floor(price * 0.7));
     const priceMax = Math.ceil(price * 1.3);
     const where: Record<string, unknown> = {
@@ -814,55 +835,65 @@ router.get('/similar/:slug', (async (req: Request, res: Response) => {
       take: 8,
     });
     const ads = list.map(serializeListingAd);
-    return s.json({ ads });
+    const payload = { ads };
+    try {
+      JSON.stringify(payload);
+    } catch (serErr) {
+      console.error('Similar ads JSON serialize error:', slug, serErr);
+    }
+    return s.json(payload);
   } catch (err) {
-    console.error('Similar ads error:', err);
+    console.error('Similar ads error:', slug, err);
     s.status(500).json({ error: 'Greška pri preuzimanju sličnih oglasa' });
   }
 }) as any);
 
 /** Serijalizuje Ad za JSON – izbjegava Prisma Decimal i druge probleme. */
 function serializeAdForJson(ad: any, poglediOverride?: number) {
-  const pogledi = poglediOverride ?? ad.pogledi;
-  return {
-    id: ad.id,
-    naslov: ad.naslov,
-    slug: ad.slug,
-    opis: ad.opis,
-    kategorija: ad.kategorija,
-    potkategorija: ad.potkategorija ?? null,
-    cijena: Number(ad.cijena),
-    lokacija: ad.lokacija,
-    lat: ad.lat ?? null,
-    lng: ad.lng ?? null,
-    status: ad.status,
-    vlasnikId: ad.vlasnikId,
-    pogledi: typeof pogledi === 'number' ? pogledi : Number(pogledi),
-    expiresAt: ad.expiresAt?.toISOString?.() ?? ad.expiresAt ?? null,
-    featuredUntil: ad.featuredUntil?.toISOString?.() ?? ad.featuredUntil ?? null,
-    tipOglasa: ad.tipOglasa ?? null,
-    details: ad.details ?? null,
-    make: ad.make ?? null,
-    model: ad.model ?? null,
-    makeId: ad.makeId ?? null,
-    modelId: ad.modelId ?? null,
-    vehicleSpecs: ad.vehicleSpecs ?? null,
-    lastActivityAt: ad.lastActivityAt?.toISOString?.() ?? ad.lastActivityAt ?? null,
-    createdAt: ad.createdAt?.toISOString?.() ?? ad.createdAt ?? null,
-    updatedAt: ad.updatedAt?.toISOString?.() ?? ad.updatedAt ?? null,
-    images: Array.isArray(ad.images)
-      ? ad.images.map((img: any) => ({
-          url: img.url,
-          thumbUrl: img.thumbUrl ?? null,
-          width: img.width ?? null,
-          height: img.height ?? null,
-          order: img.order ?? 0,
-        }))
-      : [],
-    vlasnik: ad.vlasnik
-      ? { id: ad.vlasnik.id, ime: ad.vlasnik.ime, telefon: ad.vlasnik.telefon }
-      : null,
-  };
+  try {
+    const pogledi = poglediOverride ?? ad?.pogledi;
+    const v = ad?.vlasnik;
+    return {
+      id: ad?.id ?? '',
+      naslov: ad?.naslov ?? '',
+      slug: ad?.slug ?? '',
+      opis: ad?.opis ?? '',
+      kategorija: ad?.kategorija ?? '',
+      potkategorija: ad?.potkategorija ?? null,
+      cijena: safeNum(ad?.cijena),
+      lokacija: ad?.lokacija ?? '',
+      lat: ad?.lat ?? null,
+      lng: ad?.lng ?? null,
+      status: ad?.status ?? 'AKTIVAN',
+      vlasnikId: ad?.vlasnikId ?? '',
+      pogledi: typeof pogledi === 'number' && !Number.isNaN(pogledi) ? pogledi : safeNum(pogledi),
+      expiresAt: safeDate(ad?.expiresAt),
+      featuredUntil: safeDate(ad?.featuredUntil),
+      tipOglasa: ad?.tipOglasa ?? null,
+      details: ad?.details ?? null,
+      make: ad?.make ?? null,
+      model: ad?.model ?? null,
+      makeId: ad?.makeId ?? null,
+      modelId: ad?.modelId ?? null,
+      vehicleSpecs: ad?.vehicleSpecs ?? null,
+      lastActivityAt: safeDate(ad?.lastActivityAt),
+      createdAt: safeDate(ad?.createdAt),
+      updatedAt: safeDate(ad?.updatedAt),
+      images: Array.isArray(ad?.images)
+        ? ad.images.map((img: any) => ({
+            url: img?.url ?? '',
+            thumbUrl: img?.thumbUrl ?? null,
+            width: img?.width ?? null,
+            height: img?.height ?? null,
+            order: safeNum(img?.order),
+          }))
+        : [],
+      vlasnik: v ? { id: v.id ?? '', ime: v.ime ?? '', telefon: v.telefon ?? '' } : null,
+    };
+  } catch (e) {
+    console.error('serializeAdForJson error:', e);
+    throw e;
+  }
 }
 
 /**
@@ -906,9 +937,14 @@ router.get('/:slug', optionalAuthenticate as any, (async (req: Request, res: Res
     }
     const pogledi = ad.pogledi + (doIncrement ? 1 : 0);
     const payload = serializeAdForJson(ad, pogledi);
+    try {
+      JSON.stringify(payload);
+    } catch (serErr) {
+      console.error('Ad by slug JSON serialize error:', slug, serErr);
+    }
     s.json(payload);
   } catch (err) {
-    console.error('Ad by slug error:', err);
+    console.error('Ad by slug error:', slug, err);
     s.status(500).json({ error: 'Greška pri preuzimanju oglasa' });
   }
 }) as any);
