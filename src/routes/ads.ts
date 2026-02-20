@@ -603,6 +603,21 @@ router.patch('/my/:id', authenticate as any, (async (req: Request, res: Response
       data: data as any,
       include: { images: { orderBy: { order: 'asc' } }, vlasnik: { select: { id: true, ime: true, telefon: true } } }
     });
+
+    if ((data as Record<string, unknown>).status === AdStatus.NA_CEKANJU) {
+      try {
+        const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+        const link = `/admin/pending`;
+        const naslov = 'Izmjene oglasa na čekanju';
+        const poruka = (updated.naslov || ad.naslov || 'Oglas')?.slice(0, 80);
+        for (const adm of admins) {
+          await createNotification(adm.id, 'ADMIN_PENDING_AD', naslov, poruka, link, adId, Date.now());
+        }
+      } catch (notifErr) {
+        console.error('Admin pending-edit notification:', notifErr);
+      }
+    }
+
     s.json(updated);
   } catch (err) {
     if (err instanceof z.ZodError) {
