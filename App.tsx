@@ -48,7 +48,7 @@ import { FormField } from './components/FormField';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
 const AdminRoutes = React.lazy(() => import('./AdminPanel').then((m) => ({ default: m.AdminRoutes })));
-import { getApiBase, getApiBaseForRedirect, getSocketUrl, getProxiedImageUrl, TRANSPARENT_1X1, isChatDebug } from './api';
+import { getApiBase, getApiBaseForRedirect, getSocketUrl, getProxiedImageUrl, getDirectImageUrl, TRANSPARENT_1X1, isChatDebug } from './api';
 import { apiFetch } from './lib/api/client';
 import { useAds } from './hooks/useAds';
 import { useFavorites } from './hooks/useFavorites';
@@ -4103,6 +4103,11 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [formData, setFormData] = useState<any>({ naslov: '', opis: '', cijena: '', lokacija: 'Podgorica', tipOglasa: 'prodajem', realEstateDetails: {}, details: {} });
   const [images, setImages] = useState<EditImageItem[]>([]);
+  const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setFailedImageUrls(new Set());
+  }, [id]);
 
   useEffect(() => {
     if (!user || !id) { setLoading(false); return; }
@@ -4147,6 +4152,15 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
       next.splice(index, 1);
       return next;
     });
+  };
+
+  const getEditImageSrc = (item: EditImageItem): string => {
+    if (item.type === 'file') return item.preview;
+    if (failedImageUrls.has(item.url)) return '';
+    return getDirectImageUrl(item.url);
+  };
+  const handleEditImageError = (item: EditImageItem) => {
+    if (item.type === 'url') setFailedImageUrls(prev => new Set(prev).add(item.url));
   };
 
   const moveImage = (index: number, dir: 'left' | 'right') => {
@@ -4242,9 +4256,19 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl">
           <h3 className="text-xs font-black uppercase text-[#9CA3AF] mb-4">Slike ({images.length}/10)</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            {images.map((img, i) => (
+            {images.map((img, i) => {
+              const src = getEditImageSrc(img);
+              const isFailed = img.type === 'url' && failedImageUrls.has(img.url);
+              return (
               <div key={i} className="aspect-square relative rounded-2xl overflow-hidden border border-white/10 group">
-                <img src={getProxiedImageUrl(img.type === 'url' ? img.url : img.preview)} alt="" className="w-full h-full object-cover" width={400} height={400} decoding="async" fetchPriority="low" loading="lazy" />
+                {isFailed || !src ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-[#0B1220] text-[#9CA3AF]" style={{ minHeight: 120 }}>
+                    <span className="text-[10px] font-bold uppercase">Slika {i + 1}</span>
+                    <span className="text-[9px] opacity-80">{isFailed ? 'Nije učitana' : ''}</span>
+                  </div>
+                ) : (
+                  <img src={src} alt={`Slika ${i + 1}`} className="w-full h-full object-cover" width={400} height={400} decoding="async" fetchPriority="low" loading="lazy" onError={() => handleEditImageError(img)} />
+                )}
                 {i === 0 && <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] font-bold uppercase text-center py-1 text-white">Glavna</span>}
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100">
                   <button type="button" onClick={() => moveImage(i, 'left')} disabled={i === 0} className="p-1.5 bg-white/90 text-black rounded-lg disabled:opacity-30"><ChevronLeft className="w-3 h-3" /></button>
@@ -4252,7 +4276,8 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
                   <button type="button" onClick={() => removeImage(i)} className="p-1.5 bg-red-500 text-white rounded-lg"><X className="w-3 h-3" /></button>
                 </div>
               </div>
-            ))}
+            );
+            })}
             {images.length < 10 && <button type="button" onClick={() => fileInputRef.current?.click()} className="aspect-square bg-[#0B1220] border border-dashed border-white/10 rounded-2xl flex items-center justify-center gap-2 text-[#9CA3AF] hover:border-[#4F6DFF]"><Plus className="w-6 h-6" /><span className="text-[9px] font-black uppercase">Dodaj</span></button>}
           </div>
           <input ref={fileInputRef} type="file" className="hidden" accept="image/jpeg,image/png,image/webp" multiple onChange={handleImageAdd} />

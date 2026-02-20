@@ -86,6 +86,7 @@ router.get('/img', imgProxyLimiter as any, async (req: Request, res: Response): 
         res.set({
           'Cache-Control': `public, max-age=${CACHE_MAX_AGE}`,
           'Content-Type': 'image/webp',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         });
         res.send(out);
         return;
@@ -97,6 +98,7 @@ router.get('/img', imgProxyLimiter as any, async (req: Request, res: Response): 
     res.set({
       'Cache-Control': `public, max-age=${CACHE_MAX_AGE}`,
       'Content-Type': contentType,
+      'Cross-Origin-Resource-Policy': 'cross-origin',
     });
     res.send(buf);
   } catch (e) {

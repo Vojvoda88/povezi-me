@@ -112,3 +112,10 @@ export function getProxiedImageUrl(
   if (height != null && height > 0) out += `&h=${Math.min(height, 1200)}`;
   return out;
 }
+
+/** Direktan Supabase URL – koristi kad proxy blokira (npr. NotSameOrigin). Supabase public bucket dozvoljava cross-origin. */
+export function getDirectImageUrl(url: string | undefined | null): string {
+  if (url == null || url === '') return '';
+  const safe = String(url).trim();
+  return safe.startsWith('http://') ? 'https://' + safe.slice(7) : safe;
+}
