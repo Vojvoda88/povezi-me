@@ -48,6 +48,9 @@ import { getFallbackMakeItems, getFallbackModelItems, hasFallbackCatalog } from 
 import { FixedSizeList as VirtualList } from 'react-window';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
+import { Header } from './components/Header';
+import { Footer } from './components/Footer';
+import { NotFound, LegalPage, PaymentSuccessPage, ForgotPasswordPage, ResetLozinkePage, PRAVILA_CONTENT, PRIVATNOST_CONTENT } from './pages';
 const MarketplaceMap = React.lazy(() => import('./components/MarketplaceMap').then(m => ({ default: m.MarketplaceMap })));
 const MapLocationPicker = React.lazy(() => import('./components/MapLocationPicker').then(m => ({ default: m.MapLocationPicker })));
 const AdDetailMap = React.lazy(() => import('./components/AdDetailMap').then(m => ({ default: m.AdDetailMap })));
@@ -56,6 +59,9 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 
 const AdminRoutes = React.lazy(() => import('./AdminPanel').then((m) => ({ default: m.AdminRoutes })));
 import { getApiBase, getApiBaseForRedirect, getSocketUrl, getProxiedImageUrl, getDirectImageUrl, TRANSPARENT_1X1, isChatDebug } from './api';
+import { DEFAULT_FILTERS, CATEGORIES_WITH_FILTER_PANEL, SORT_OPTIONS, VEHICLE_SUBCATEGORIES_FOR_API, MAX_UPLOAD_WIDTH, UPLOAD_JPEG_QUALITY } from './lib/marketplaceConfig';
+import { setPageMeta, getInitial, timeAgo, formatRelativeTime, resizeImageForUpload, DEFAULT_DESCRIPTION } from './lib/utils';
+import { getAuthHeaders, TOKEN_KEY } from './lib/auth';
 import { apiFetch } from './lib/api/client';
 import { useAds } from './hooks/useAds';
 import { useFavorites } from './hooks/useFavorites';
@@ -64,140 +70,11 @@ import { usePWAInstall } from './src/hooks/usePWAInstall';
 import { mapApiAdToAd } from './features/ads/mappers';
 import { io, type Socket } from 'socket.io-client';
 const API_BASE = getApiBase();
-const TOKEN_KEY = 'povezi_access_token';
 /** Chat uključen – linkovi Poruke u headeru i "Poruka prodavcu" na stranici oglasa */
 const SHOW_CHAT = true;
 
-const DEFAULT_DESCRIPTION = 'Kupuj i prodaj brzo i sigurno u Crnoj Gori. Poveži.ME Premium Marketplace.';
-function setPageMeta(title: string, description?: string, image?: string, url?: string) {
-  document.title = title;
-  let el = document.querySelector('meta[name="description"]');
-  if (!el) { el = document.createElement('meta'); el.setAttribute('name', 'description'); document.head.appendChild(el); }
-  (el as HTMLMetaElement).setAttribute('content', description || DEFAULT_DESCRIPTION);
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://povezi.me';
-  const setOg = (prop: string, content: string) => {
-    let m = document.querySelector(`meta[property="${prop}"]`);
-    if (!m) { m = document.createElement('meta'); m.setAttribute('property', prop); document.head.appendChild(m); }
-    (m as HTMLMetaElement).setAttribute('content', content);
-  };
-  setOg('og:title', title);
-  setOg('og:description', description || DEFAULT_DESCRIPTION);
-  setOg('og:url', url || (typeof window !== 'undefined' ? window.location.href : baseUrl));
-  if (image) setOg('og:image', image);
-}
 const THEME_KEY = 'povezi_theme';
 export type ThemeId = 'midnight' | 'light';
-
-const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const getInitial = (value: string | undefined | null, fallback: string = '?') => {
-  if (typeof value !== 'string') return fallback;
-  const trimmed = value.trim();
-  if (!trimmed) return fallback;
-  const first = trimmed[0];
-  return first || fallback;
-};
-
-// Define default filters used for marketplace search and filtering (ključevi usklađeni s FilterPanel-om: godisteMin/Max, kilometrazaMin/Max)
-const DEFAULT_FILTERS = {
-  lokacija: '',
-  priceMin: '',
-  priceMax: '',
-  marka: '',
-  model: '',
-  godisteMin: '',
-  godisteMax: '',
-  kilometrazaMin: '',
-  kilometrazaMax: '',
-  gorivo: '',
-  mjenjac: '',
-  karoserija: '',
-  pogon: '',
-  stanje: '',
-  kubikazaMin: '',
-  kubikazaMax: '',
-  snagaMin: '',
-  snagaMax: '',
-  tip: '',
-  tipOglasa: '',
-  tip_ponude: '',
-  tip_nekretnine: '',
-  kvadraturaMin: '',
-  broj_soba: '',
-  sprat: '',
-  amenities: '',
-  klasaNosivosti: '',
-  nosivostKg: '',
-  brojOsovina: '',
-  radniSati: '',
-  brojCilindara: '',
-  kabina: '',
-  emisioniStandard: '',
-  tipDijela: '',
-  nacinNaplate: '',
-  tipBijela: '',
-  energetskaKlasa: '',
-  tipNamjestaj: '',
-  materijal: '',
-  tipZaDjecu: '',
-  uzrast: '',
-  tipPoljoprivreda: '',
-  tipTehnika: '',
-  vrstaKucni: '',
-  tipModa: '',
-  velicinaModa: '',
-  tipPoslovi: '',
-  tipSport: '',
-  tipGradjevina: '',
-  tipPokloni: '',
-  povodPokloni: '',
-};
-
-const CATEGORIES_WITH_FILTER_PANEL = ['nekretnine', 'auto_dijelovi', 'usluge', 'bijela_tehnika', 'namjestaj', 'za_djecu', 'poljoprivreda', 'tehnika', 'kucni_ljubimci', 'moda', 'poslovi', 'sport', 'gradjevina', 'pokloni_cvijece'];
-
-const SORT_OPTIONS: { value: string; label: string }[] = [
-  { value: '', label: 'Najnoviji (istaknuti prvo)' },
-  { value: 'price_asc', label: 'Cijena: najniža' },
-  { value: 'price_desc', label: 'Cijena: najviša' },
-];
-
-const MAX_UPLOAD_WIDTH = 1200;
-const UPLOAD_JPEG_QUALITY = 0.85;
-
-function resizeImageForUpload(file: File): Promise<File | Blob> {
-  if (!file.type.startsWith('image/')) return Promise.resolve(file);
-  return new Promise((resolve) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const { width, height } = img;
-      if (width <= MAX_UPLOAD_WIDTH && height <= MAX_UPLOAD_WIDTH) {
-        resolve(file);
-        return;
-      }
-      const scale = Math.min(MAX_UPLOAD_WIDTH / width, MAX_UPLOAD_WIDTH / height, 1);
-      const w = Math.round(width * scale);
-      const h = Math.round(height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(file); return; }
-      ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => resolve(blob || file),
-        'image/jpeg',
-        UPLOAD_JPEG_QUALITY
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
-    img.src = url;
-  });
-}
 
 const DROPDOWN_SCROLL_HEIGHT = 320;
 const TOP_COUNT = 10;
@@ -322,44 +199,6 @@ const VehicleMakeModelDropdown: React.FC<{
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const timeAgo = (date: number) => {
-  const seconds = Math.floor((Date.now() - date) / 1000);
-  if (seconds < 60) return 'Upravo sada';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `pre ${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `pre ${hours}h`;
-  return new Date(date).toLocaleDateString();
-};
-
-const Logo = ({ variant = 'horizontal' }: { variant?: 'horizontal' | 'vertical' }) => {
-  const icon = (
-    <img src="/logo-icon.svg" alt="" className="h-9 sm:h-10 lg:h-11 w-9 sm:w-10 lg:w-11 object-contain shrink-0" />
-  );
-  const text = (
-    <span className="font-bold tracking-tight whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-      Poveži<span style={{ color: 'var(--accent)' }}>.ME</span>
-    </span>
-  );
-  if (variant === 'vertical') {
-    return (
-      <div className="flex flex-col items-center gap-2">
-        {icon}
-        {text}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-2 shrink-0">
-      {icon}
-      <div className="flex flex-col justify-center leading-tight">
-        <span className="text-base sm:text-lg lg:text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Poveži<span style={{ color: 'var(--accent)' }}>.ME</span></span>
-        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest hidden sm:block" style={{ color: 'var(--text-secondary)' }}>Premium Marketplace</span>
-      </div>
     </div>
   );
 };
@@ -749,188 +588,7 @@ const App: React.FC = () => (
   </Router>
 );
 
-const Header: React.FC<{ user: User | null, notifications: Notification[], favoritesCount: number, onLogout: () => void, theme: ThemeId, onThemeChange: (t: ThemeId) => void, mobileSearchOpen?: boolean, onMobileSearchOpenChange?: (open: boolean) => void, pendingAdminCount?: number }> = ({ user, notifications, favoritesCount, onLogout, theme, onThemeChange, mobileSearchOpen = false, onMobileSearchOpenChange, pendingAdminCount = 0 }) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-  const [showIOSInstallHint, setShowIOSInstallHint] = useState(false);
-  const searchInputRef = React.useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
-  const pwa = usePWAInstall();
-  const [searchParams] = useSearchParams();
-  const unreadCount = notifications.filter(n => !n.procitano).length;
-  const hasPendingAds = user?.role === 'admin' && pendingAdminCount > 0;
-
-  useEffect(() => { setSearchValue(searchParams.get('q') || ""); }, [searchParams]);
-  useEffect(() => { if (mobileSearchOpen) searchInputRef.current?.focus(); }, [mobileSearchOpen]);
-
-  const handleSearch = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    onMobileSearchOpenChange?.(false);
-    if (searchValue.trim()) navigate(`/marketplace?q=${encodeURIComponent(searchValue.trim())}`);
-    else navigate('/marketplace');
-  };
-
-  return (
-    <nav className="fixed top-0 left-0 right-0 border-b z-[1000] h-16 lg:h-20 flex items-center transition-colors" style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)' }}>
-      <div className="max-w-7xl mx-auto px-4 w-full flex justify-between items-center">
-        <Link to="/"><Logo /></Link>
-        {/* Na mobilnoj se polje prikaže kad korisnik pritisne "Traži" u donjoj traci; na desktopu uvijek vidljivo */}
-        <div className={`flex-grow max-w-xl mx-4 lg:mx-8 ${mobileSearchOpen ? 'block' : 'hidden'} lg:block`}>
-           <form onSubmit={handleSearch} className="relative w-full flex items-center gap-2">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 lg:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 lg:w-4 h-4 opacity-60 pointer-events-none" style={{ color: 'var(--text-secondary)' }} />
-                <input ref={searchInputRef} type="text" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} placeholder="Pretraži..." className="w-full h-10 lg:h-12 border rounded-xl pl-10 lg:pl-12 pr-10 lg:pr-4 text-xs lg:text-sm outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-                {mobileSearchOpen && (
-                  <button type="button" onClick={() => onMobileSearchOpenChange?.(false)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg lg:hidden" style={{ color: 'var(--text-secondary)' }} aria-label="Zatvori pretragu"><X className="w-4 h-4" /></button>
-                )}
-              </div>
-              <button type="submit" className="hidden sm:block h-10 lg:h-12 px-4 lg:px-6 text-white rounded-xl font-bold text-[10px] lg:text-xs uppercase transition-colors" style={{ backgroundColor: 'var(--accent)' }}>Pretraži</button>
-           </form>
-        </div>
-        <div className="flex items-center gap-2 lg:gap-4">
-          <button
-            type="button"
-            onClick={() => onThemeChange(theme === 'midnight' ? 'light' : 'midnight')}
-            className="p-2 rounded-xl transition-colors hover:opacity-80 flex items-center justify-center"
-            style={{ color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}
-            title={theme === 'midnight' ? 'Svijetla tema' : 'Tamna tema'}
-            aria-label="Promijeni temu"
-          >
-            {theme === 'midnight' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
-          <Link to="/objavi" className="hidden lg:flex h-11 text-white px-5 rounded-xl items-center gap-2 font-black uppercase text-[10px] transition-colors" style={{ backgroundColor: 'var(--accent)' }}><PlusCircle className="w-4 h-4" /> Objavi Oglas</Link>
-          {user?.role === 'admin' && (
-            <>
-              {hasPendingAds && (
-                <Link to="/admin/pending" className="hidden lg:flex h-10 lg:h-11 px-3 lg:px-4 rounded-xl items-center gap-2 font-bold text-[10px] lg:text-xs uppercase border relative" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', backgroundColor: 'rgba(79, 109, 255, 0.12)' }} title={`${pendingAdminCount} oglasa na čekanju`}>
-                  <Bell className="w-4 h-4" />
-                  <span>Na čekanju</span>
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount}</span>
-                </Link>
-              )}
-              <Link to="/admin" className="hidden lg:flex h-10 lg:h-11 px-3 lg:px-4 rounded-xl items-center gap-2 font-bold text-[10px] lg:text-xs uppercase border transition-colors relative" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }} title="Admin panel"><ShieldCheck className="w-4 h-4" /> Admin{hasPendingAds ? <span className="ml-0.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount}</span> : null}</Link>
-            </>
-          )}
-          {SHOW_CHAT && user && <Link to="/poruke" className="p-2 rounded-xl hidden lg:block transition-colors hover:opacity-80" style={{ color: 'var(--text-secondary)' }} title="Poruke"><MessageCircle className="w-5 h-5" /></Link>}
-          {user && (
-            <Link to="/obavjestenja" className="p-2 relative rounded-xl transition-colors hover:opacity-80 flex items-center justify-center" style={{ color: 'var(--text-secondary)' }} title="Obavještenja"><Bell className="w-5 h-5" />{unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}</Link>
-          )}
-          {!user && (
-            <Link to="/prijava" className="hidden sm:flex h-10 lg:h-11 px-4 text-white rounded-xl items-center justify-center font-bold text-[10px] lg:text-xs uppercase transition-colors" style={{ backgroundColor: 'var(--accent)' }}>Prijavi se</Link>
-          )}
-          <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 lg:w-10 lg:h-10 flex items-center justify-center rounded-xl border overflow-hidden transition-all active:scale-95" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} aria-label="Meni">{user ? <span className="font-bold text-[10px] lg:text-xs" style={{ color: 'var(--accent)' }}>{getInitial(user.ime)}</span> : <UserIcon className="w-4 h-4 lg:w-5 lg:h-5" style={{ color: 'var(--text-secondary)' }} />}</button>
-        </div>
-      </div>
-      {menuOpen && createPortal(
-        <div className="fixed inset-0 z-[2000]" aria-hidden="false">
-          <div className="absolute inset-0 bg-black/70 z-[2001]" style={{ pointerEvents: 'none' }} aria-hidden />
-          <div
-            className="povezi-profile-menu-panel absolute right-0 top-0 bottom-0 w-72 z-[2002] border-l-2 p-6 shadow-2xl animate-slide-in-right transition-colors"
-            style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-8">
-              <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>Meni</span>
-              <button type="button" onClick={() => setMenuOpen(false)} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--text-secondary)' }}><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-2">
-              <MenuLink to="/marketplace" icon={<ArrowLeft className="w-4 h-4" />} label="Glavna stranica" onClick={() => setMenuOpen(false)} />
-              {user ? (
-                <>
-                  <MenuLink to="/objavi" icon={<PlusCircle className="w-4 h-4" />} label="Objavi oglas" onClick={() => setMenuOpen(false)} />
-                  <MenuLink to="/moji-oglasi" icon={<LayoutDashboard className="w-4 h-4" />} label="Moji Oglasi" onClick={() => setMenuOpen(false)} />
-                  <MenuLink to="/moji-favoriti" icon={<Heart className="w-4 h-4" />} label="Sačuvano" onClick={() => setMenuOpen(false)} />
-                  <MenuLink to="/moje-spremljene-pretrage" icon={<BookmarkPlus className="w-4 h-4" />} label="Spremljene pretrage" onClick={() => setMenuOpen(false)} />
-                  <MenuLink to="/obavjestenja" icon={<Bell className="w-4 h-4" />} label="Obavještenja" onClick={() => setMenuOpen(false)} />
-                  {SHOW_CHAT && <MenuLink to="/poruke" icon={<MessageSquare className="w-4 h-4" />} label="Poruke" onClick={() => setMenuOpen(false)} />}
-                  <div className="h-px bg-slate-700 my-4" style={{ backgroundColor: 'var(--border-subtle)' }} />
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-3 p-3 font-bold text-red-400 hover:bg-red-500/20 rounded-xl transition-all border border-red-500/20 relative z-[2003]"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setMenuOpen(false);
-                      onLogout();
-                      navigate('/', { replace: true });
-                    }}
-                  >
-                    <LogOut className="w-4 h-4 shrink-0" /> Odjavi se
-                  </button>
-                </>
-              ) : (
-                <>
-                  <MenuLink to="/prijava" icon={<UserIcon className="w-4 h-4" />} label="Prijavi se" onClick={() => setMenuOpen(false)} />
-                </>
-              )}
-              {pwa.showInstallLink && (
-                pwa.canInstall ? (
-                  <button type="button" onClick={() => { pwa.promptInstall(); setMenuOpen(false); }} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
-                    <Smartphone className="w-4 h-4 shrink-0" /> Preuzmi aplikaciju
-                  </button>
-                ) : pwa.isIOS ? (
-                  <>
-                    <button type="button" onClick={() => setShowIOSInstallHint(!showIOSInstallHint)} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
-                      <Smartphone className="w-4 h-4 shrink-0" /> Dodaj na početni ekran
-                    </button>
-                    {showIOSInstallHint && (
-                      <div className="px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
-                        Pritisni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Share</span> (ikonu deljenja) u Safari-ju, pa izaberi &quot;Dodaj na početni ekran&quot;.
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <button type="button" onClick={() => setShowIOSInstallHint(!showIOSInstallHint)} className="w-full flex items-center gap-3 p-3 font-bold rounded-xl transition-all text-left" style={{ color: 'var(--accent)' }}>
-                      <Smartphone className="w-4 h-4 shrink-0" /> Preuzmi aplikaciju
-                    </button>
-                    {showIOSInstallHint && (
-                      <div className="px-3 py-2 rounded-xl text-xs" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
-                        {pwa.isMobile ? (
-                          <>U Chrome-u: pritisni meni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>⋮</span> (tri tačke) pa izaberi &quot;Instaliraj aplikaciju&quot; ili &quot;Dodaj na početni ekran&quot;.</>
-                        ) : (
-                          <>U Chrome-u: pritisni meni <span className="font-bold" style={{ color: 'var(--text-primary)' }}>⋮</span> (tri tačke) pa izaberi &quot;Instaliraj Povezi.ME&quot;. Možda će opcija biti dostupna nakon par posjeta.</>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )
-              )}
-              {user?.role === 'admin' && (
-                <Link to="/admin" onClick={() => setMenuOpen(false)} className="flex items-center justify-between gap-3 p-3 font-bold rounded-xl transition-all" style={{ color: 'var(--text-primary)' }}>
-                  <span className="flex items-center gap-3"><span style={{ color: 'var(--accent)' }}><ShieldCheck className="w-4 h-4" /></span> Admin panel</span>
-                  {hasPendingAds && <span className="min-w-[22px] h-6 px-2 flex items-center justify-center rounded-full text-xs font-black text-white" style={{ backgroundColor: '#ef4444' }}>{pendingAdminCount} na čekanju</span>}
-                </Link>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="absolute inset-0 z-[2001] cursor-default"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Zatvori meni"
-          />
-        </div>,
-        document.body
-      )}
-    </nav>
-  );
-};
-
-const MenuLink = ({ to, icon, label, onClick }: { to: string, icon: React.ReactNode, label: string, onClick: () => void }) => (
-  <Link to={to} onClick={onClick} className="flex items-center gap-3 p-3 font-bold rounded-xl transition-all" style={{ color: 'var(--text-primary)' }}><span style={{ color: 'var(--accent)' }}>{icon}</span> {label}</Link>
-);
-
-const NavLink = ({ to, icon, label, count }: { to: string, icon: React.ReactNode, label: string, count?: number }) => {
-  const location = useLocation();
-  const isActive = location.pathname === to;
-  return (
-    <Link to={to} className="flex flex-col items-center gap-1 py-1 w-16 transition-colors cursor-pointer min-h-[44px] justify-center" style={{ color: isActive ? 'var(--accent)' : 'var(--text-secondary)' }}>
-      <div className="relative">{icon}{count ? count > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" /> : null}</div>
-      <span className="text-[9px] font-bold uppercase tracking-tight">{label}</span>
-    </Link>
-  );
-};
+/* Header in components/Header.tsx */
 
 const Marketplace: React.FC<{
   user: User | null;
@@ -2004,8 +1662,6 @@ const Marketplace: React.FC<{
     </div>
   );
 };
-
-const VEHICLE_SUBCATEGORIES_FOR_API = ['automobili', 'motocikli', 'kamioni', 'traktori', 'cetvorotockasi', 'kombi', 'autobusi', 'prikolice', 'kamperi'];
 
 const FilterPanel: React.FC<{ category: string, initialFilters: any, onApply: (f: any) => void, onReset: () => void, apiBase: string }> = ({ category, initialFilters, onApply, onReset, apiBase }) => {
   const [localFilters, setLocalFilters] = useState<any>(initialFilters);
@@ -3652,15 +3308,6 @@ const Chat = ({ user, ads, conversations: _conversations, setConversations: _set
     </div>
   );
 };
-
-function formatRelativeTime(ts: number): string {
-  const d = Date.now() - ts;
-  if (d < 60000) return 'prije manje od 1 min';
-  if (d < 3600000) return `prije ${Math.floor(d / 60000)} min`;
-  if (d < 86400000) return `prije ${Math.floor(d / 3600000)} h`;
-  if (d < 604800000) return `prije ${Math.floor(d / 86400000)} d`;
-  return new Date(ts).toLocaleDateString();
-}
 
 const Notifications = ({ notifications, onMarkRead, onRefresh }: { notifications: Notification[]; onMarkRead: (id: string) => void; onRefresh?: () => void }) => {
   const navigate = useNavigate();
@@ -5484,162 +5131,5 @@ const MyFavorites: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: 
     </div>
   );
 };
-
-const PRAVILA_CONTENT = (
-  <>
-    <p className="mb-4">Dobrodošli na Poveži.ME. Korištenjem platforme prihvatate ova pravila.</p>
-    <p className="mb-4">Korisnici su dužni objavljivati istinite podatke, poštovati zakon i prava trećih. Zabranjeno je objavljivanje nezakonitog sadržaja, uznemiravanje drugih korisnika i zloupotreba usluge. Administrator zadržava pravo uklanjanja oglasa i blokiranja korisnika koji krše pravila.</p>
-    <p className="mb-4">Svi oglasi i komunikacija između korisnika su isključiva odgovornost korisnika. Poveži.ME je samo platforma za oglašavanje i ne garantuje ispunjenje transakcija.</p>
-    <p>Za pitanja: kontakt putem informacija na stranici.</p>
-  </>
-);
-const PRIVATNOST_CONTENT = (
-  <>
-    <p className="mb-4">Vaše privatnost nam je važna. Pri registraciji prikupljamo e-mail, ime i telefon kako bismo omogućili funkcionisanje naloga i kontakt u vezi s oglasima.</p>
-    <p className="mb-4">Podatke ne prodajemo trećima. Koristimo ih isključivo za pružanje usluge, autentifikaciju i, ako pristanete, slanje obavještenja. Podaci se čuvaju na sigurnim serverima.</p>
-    <p className="mb-4">Možete zatražiti pristup, ispravku ili brisanje svojih podataka putem postavki naloga ili kontaktom. Kolačići se koriste za sesiju i preferencije; možete ih kontrolisati u pregledniku.</p>
-    <p>Izmjene politike objavljujemo na ovoj stranici. Nastavkom korištenja prihvatate ažuriranu politiku.</p>
-  </>
-);
-const NotFound: React.FC = () => (
-  <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-    <h1 className="text-4xl font-black uppercase tracking-tight mb-4" style={{ color: 'var(--text-primary)' }}>404</h1>
-    <p className="text-lg font-bold mb-8" style={{ color: 'var(--text-secondary)' }}>Stranica nije pronađena</p>
-    <Link to="/" className="inline-block h-14 px-8 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>← Nazad na početnu</Link>
-  </div>
-);
-
-const PaymentSuccessPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const sessionId = searchParams.get('session_id');
-  const adId = searchParams.get('ad_id');
-  const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(!!sessionId);
-  useEffect(() => {
-    if (!sessionId) return;
-    fetch(`${API_BASE}/payments/session-status?session_id=${encodeURIComponent(sessionId)}`, { headers: getAuthHeaders() })
-      .then((res) => res.json())
-      .then((data: { status?: string; adSlug?: string }) => { setStatus(data.status ?? null); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [sessionId]);
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-24 text-center">
-      {loading ? (
-        <Loader2 className="w-12 h-12 animate-spin mx-auto mb-6" style={{ color: 'var(--accent)' }} />
-      ) : status === 'succeeded' ? (
-        <>
-          <CheckCircle2 className="w-16 h-16 mx-auto mb-6" style={{ color: 'var(--accent)' }} />
-          <h1 className="text-2xl font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Uplata uspješna</h1>
-          <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>Vaš oglas je sada istaknut.</p>
-          <Link to={adId ? `/moji-oglasi` : '/'} className="inline-block h-14 px-8 rounded-2xl font-black uppercase text-xs" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Moji oglasi</Link>
-        </>
-      ) : (
-        <>
-          <h1 className="text-2xl font-black uppercase mb-4" style={{ color: 'var(--text-primary)' }}>Uplata</h1>
-          <p className="mb-8" style={{ color: 'var(--text-secondary)' }}>{status === 'pending' ? 'Čekamo potvrdu...' : 'Nije moguće potvrditi status. Provjerite Moji oglasi.'}</p>
-          <Link to="/moji-oglasi" className="inline-block h-14 px-8 rounded-2xl font-black uppercase text-xs" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>Moji oglasi</Link>
-        </>
-      )}
-    </div>
-  );
-};
-
-const ForgotPasswordPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    fetch(`${API_BASE}/auth/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
-      .then((res) => res.json())
-      .then((data: { message?: string; error?: string }) => {
-        setLoading(false);
-        if (data.error) setError(data.error);
-        else { setSent(true); }
-      })
-      .catch(() => { setLoading(false); setError('Greška u mreži.'); });
-  };
-  return (
-    <div className="max-w-md mx-auto px-4 py-24">
-      <h1 className="text-2xl font-black uppercase mb-6" style={{ color: 'var(--text-primary)' }}>Zaboravljena lozinka</h1>
-      {sent ? (
-        <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Ako postoji nalog s tim emailom, poslat ćemo link za reset.</p>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required className="w-full h-14 rounded-2xl px-4 border outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-          <button type="submit" disabled={loading} className="w-full h-14 rounded-2xl font-black uppercase text-xs" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>{loading ? 'Šaljem...' : 'Pošalji link'}</button>
-        </form>
-      )}
-      <Link to="/prijava" className="inline-block mt-6 text-[10px] font-black uppercase" style={{ color: 'var(--accent)' }}>← Nazad na prijavu</Link>
-    </div>
-  );
-};
-
-const ResetLozinkePage: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') || '';
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (password !== confirm) { setError('Lozinke se ne podudaraju.'); return; }
-    if (password.length < 6) { setError('Lozinka min 6 znakova.'); return; }
-    setLoading(true);
-    fetch(`${API_BASE}/auth/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, newPassword: password }) })
-      .then((res) => res.json())
-      .then((data: { message?: string; error?: string }) => {
-        setLoading(false);
-        if (data.error) setError(data.error);
-        else setDone(true);
-      })
-      .catch(() => { setLoading(false); setError('Greška u mreži.'); });
-  };
-  if (!token) return <div className="max-w-md mx-auto px-4 py-24 text-center"><p style={{ color: 'var(--text-secondary)' }}>Link za reset nije ispravan.</p><Link to="/zaboravljena-lozinka" style={{ color: 'var(--accent)' }}>Zatražite novi</Link>.</div>;
-  return (
-    <div className="max-w-md mx-auto px-4 py-24">
-      <h1 className="text-2xl font-black uppercase mb-6" style={{ color: 'var(--text-primary)' }}>Nova lozinka</h1>
-      {done ? (
-        <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>Lozinka je promijenjena. Možete se prijaviti.</p>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Nova lozinka (min 6)" required minLength={6} className="w-full h-14 rounded-2xl px-4 border outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Ponovi lozinku" required className="w-full h-14 rounded-2xl px-4 border outline-none" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
-          <button type="submit" disabled={loading} className="w-full h-14 rounded-2xl font-black uppercase text-xs" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>{loading ? 'Spremam...' : 'Spremi lozinku'}</button>
-        </form>
-      )}
-      <Link to="/prijava" className="inline-block mt-6 text-[10px] font-black uppercase" style={{ color: 'var(--accent)' }}>← Prijava</Link>
-    </div>
-  );
-};
-
-const LegalPage: React.FC<{ title: string; content: React.ReactNode }> = ({ title, content }) => (
-  <div className="max-w-3xl mx-auto px-4 py-12">
-    <h1 className="text-2xl font-black uppercase tracking-tight mb-8" style={{ color: 'var(--text-primary)' }}>{title}</h1>
-    <div className="prose prose-invert max-w-none text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{content}</div>
-    <Link to="/" className="inline-block mt-8 text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--accent)' }}>← Nazad na početnu</Link>
-  </div>
-);
-
-const Footer = () => (
-  <footer className="flex-shrink-0 pt-3 pb-14 px-3 lg:py-6 lg:px-4 lg:pb-6 text-center flex flex-col items-center border-t transition-colors" style={{ backgroundColor: 'var(--bg-page)', borderColor: 'var(--border-subtle)' }}>
-    <div className="flex flex-col items-center gap-2">
-      <Logo variant="vertical" />
-    </div>
-    <nav className="flex flex-wrap justify-center gap-2 lg:gap-3 mt-2 lg:mt-3">
-      <Link to="/pravila" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Pravila korištenja</Link>
-      <Link to="/privatnost" className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color: 'var(--text-secondary)' }}>Politika privatnosti</Link>
-    </nav>
-    <p className="text-[8px] lg:text-[9px] mt-2 lg:mt-4 uppercase tracking-[0.1em] lg:tracking-[0.15em] font-bold opacity-60" style={{ color: 'var(--text-secondary)' }}>© 2024 Poveži.ME Premium Marketplace</p>
-  </footer>
-);
 
 export default App;
