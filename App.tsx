@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { flushSync, createPortal } from 'react-dom';
 import {
@@ -15,7 +16,7 @@ import {
   SCROLL_TO_AD_SLUG_KEY,
   isDetailRoute,
 } from './lib/scroll';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useParams, useSearchParams, useLocation, type NavigateFunction } from 'react-router-dom';
 import { 
   Search, X, PlusCircle, MapPin, Filter, Star, Eye, Phone, LayoutDashboard,
   CheckCircle2, Trash2, ImageIcon, RefreshCcw, ChevronLeft, Menu,
@@ -1551,7 +1552,7 @@ const Marketplace: React.FC<{
               className="w-full"
             >
               <VirtualList
-                ref={virtualListRef}
+                ref={virtualListRef as any}
                 height={virtualListSize.height}
                 width={virtualListSize.width}
                 itemCount={virtualRowCount}
@@ -2278,14 +2279,14 @@ const AdCardInner: React.FC<{
     else if (coverLoadState === 'raw') setCoverLoadState('failed');
   };
 
-  const LinkOrSpan = ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => {
+  const LinkOrSpan = ({ to, children, className, style }: { to: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => {
     const useSpan = effectiveLinksDisabled || to === '#';
     if (useSpan) {
       if (import.meta.env?.DEV) {
         console.log('[LinkOrSpan]', 'render span', { to, id: ad.id, slug: ad.slug });
       }
       return (
-        <span role="button" tabIndex={0} onClick={handleCardClick} onKeyDown={e => e.key === 'Enter' && handleCardClick?.()} className={className} style={{ cursor: to === '#' ? 'default' : 'pointer' }}>
+        <span role="button" tabIndex={0} onClick={handleCardClick} onKeyDown={e => e.key === 'Enter' && handleCardClick?.()} className={className} style={{ cursor: to === '#' ? 'default' : 'pointer', ...style }}>
           {children}
         </span>
       );
@@ -2299,6 +2300,7 @@ const AdCardInner: React.FC<{
         target="_self"
         rel="noopener"
         className={className}
+        style={style}
         onClick={() => {
           onBeforeNavigate?.(ad.slug);
           if (typeof window !== 'undefined' && !onBeforeNavigate) {
@@ -2458,9 +2460,9 @@ export const AdDetailView: React.FC<{
   similarAds: Ad[];
   similarLoading: boolean;
   navigate: NavigateFunction;
-  location: Location;
+  location: { pathname: string; search: string };
   API_BASE: string;
-  getAuthHeaders: () => Record<string, string>;
+  getAuthHeaders: () => HeadersInit;
   setPageMeta: (title: string, desc?: string, img?: string, url?: string) => void;
 }> = (props) => {
   const { ad, isAdminPreview, adminActions, ownerActions, user, onToggleFavorite, favorites, ratings, onAddRating, getSellerMetrics, sellerAdsCount, similarAds, similarLoading, navigate, location, API_BASE, getAuthHeaders, setPageMeta } = props;
@@ -3608,7 +3610,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
         if (subcategory === 'automobili') {
           options = AUTOMOTIVE_CATALOG.find((b: { brand: string }) => b.brand === brand)?.models.map((m: { name: string }) => m.name) || [];
         } else if (subcategory === 'motocikli') {
-          options = (MOTO_CATALOG as Record<string, string[]>)[brand] || [];
+          options = (MOTO_CATALOG as Record<string, string[]>)[String(brand)] || [];
         }
       }
 
@@ -4903,7 +4905,8 @@ const MyAds = ({ user, onRefresh }: { user: User | null; onRefresh?: () => void 
     fetchMyAds();
   }, [user?.id]);
 
-  const handleStatusChange = (adId: string, status: 'AKTIVAN' | 'PRODAN' | 'ISTEKAO') => {
+  const handleStatusChange = (adId: string, status: 'AKTIVAN' | 'PRODAN' | 'ISTEKAO' | 'NA_CEKANJU') => {
+    if (status === 'NA_CEKANJU') return;
     if (status === 'PRODAN') {
       if (!window.confirm('Označiti oglas kao prodan? Oglas će biti trajno uklonjen sa sajta.')) return;
     }
