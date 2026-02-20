@@ -66,6 +66,9 @@ if (SENTRY_DSN && typeof SENTRY_DSN === 'string' && SENTRY_DSN.trim()) {
 
 const app = express();
 
+// Za Render/reverse proxy – rate limit mora znati pravi IP
+app.set('trust proxy', 1);
+
 const corsOptions = {
   origin: NODE_ENV === 'production' && FRONTEND_URL
     ? [FRONTEND_URL.replace(/\/$/, '')]
