@@ -89,6 +89,8 @@ model Ad {
   potkategorija  String?
   cijena         Decimal   @db.Decimal(10, 2)
   lokacija       String
+  lat            Float?    // tačna lokacija – opciono
+  lng            Float?    // tačna lokacija – opciono
   status         AdStatus  @default(NA_CEKANJU)
   vlasnikId      String
   pogledi        Int       @default(0)

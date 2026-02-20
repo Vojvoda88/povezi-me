@@ -40,14 +40,22 @@ export const MarketplaceMap: React.FC<{
     const indexByLoc: Record<string, number> = {};
     const markers: any[] = [];
     ads.forEach((ad) => {
+      const hasExactCoords = typeof ad.lat === 'number' && typeof ad.lng === 'number' && Number.isFinite(ad.lat) && Number.isFinite(ad.lng);
       const loc = ad.lokacija || 'Podgorica';
-      const coords = LOCATION_COORDS[loc] || LOCATION_COORDS['Podgorica'];
-      if (!coords) return;
-      const idx = (indexByLoc[loc] ?? 0);
-      indexByLoc[loc] = idx + 1;
-      const offset = idx * 0.008;
-      const lat = coords[0] + (idx % 2 === 0 ? offset : -offset * 0.5);
-      const lng = coords[1] + (idx % 2 === 0 ? offset * 0.5 : -offset);
+      const cityCoords = LOCATION_COORDS[loc] || LOCATION_COORDS['Podgorica'];
+      if (!cityCoords && !hasExactCoords) return;
+      let lat: number;
+      let lng: number;
+      if (hasExactCoords) {
+        lat = ad.lat as number;
+        lng = ad.lng as number;
+      } else {
+        const idx = (indexByLoc[loc] ?? 0);
+        indexByLoc[loc] = idx + 1;
+        const offset = idx * 0.008;
+        lat = cityCoords[0] + (idx % 2 === 0 ? offset : -offset * 0.5);
+        lng = cityCoords[1] + (idx % 2 === 0 ? offset * 0.5 : -offset);
+      }
       const m = L.marker([lat, lng], { icon })
         .addTo(map)
         .on('click', () => {

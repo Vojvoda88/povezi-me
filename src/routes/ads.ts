@@ -80,7 +80,9 @@ const createAdSchema = z.object({
   vehicleSpecs: z.record(z.unknown()).optional(),
   images: z.array(imageInputSchema).optional(),
   tipOglasa: z.enum(['prodajem', 'trazim']).optional(),
-  details: z.record(z.unknown()).optional()
+  details: z.record(z.unknown()).optional(),
+  lat: z.number().min(-90).max(90).optional().nullable(),
+  lng: z.number().min(-180).max(180).optional().nullable()
 });
 
 const updateAdSchema = z.object({
@@ -102,7 +104,9 @@ const updateAdSchema = z.object({
   vehicleSpecs: z.record(z.unknown()).optional(),
   tipOglasa: z.enum(['prodajem', 'trazim']).optional(),
   details: z.record(z.unknown()).optional(),
-  images: z.array(imageInputSchema).optional()
+  images: z.array(imageInputSchema).optional(),
+  lat: z.number().min(-90).max(90).optional().nullable(),
+  lng: z.number().min(-180).max(180).optional().nullable()
 });
 
 /**
@@ -122,6 +126,8 @@ const LISTING_SELECT = {
   naslov: true,
   cijena: true,
   lokacija: true,
+  lat: true,
+  lng: true,
   createdAt: true,
   featuredUntil: true,
   tipOglasa: true,
@@ -512,6 +518,8 @@ router.patch('/my/:id', authenticate as any, (async (req: Request, res: Response
     if (validated.opis !== undefined) data.opis = sanitizeHTML(validated.opis);
     if (validated.cijena !== undefined) data.cijena = new Prisma.Decimal(Number(validated.cijena));
     if (validated.lokacija !== undefined) data.lokacija = validated.lokacija;
+    if (validated.lat !== undefined) data.lat = validated.lat;
+    if (validated.lng !== undefined) data.lng = validated.lng;
     if (validated.potkategorija !== undefined) data.potkategorija = validated.potkategorija;
     if (validated.tipOglasa !== undefined) data.tipOglasa = validated.tipOglasa;
     if (validated.details !== undefined) {
@@ -534,6 +542,8 @@ router.patch('/my/:id', authenticate as any, (async (req: Request, res: Response
       validated.details !== undefined ||
       validated.cijena !== undefined ||
       validated.lokacija !== undefined ||
+      validated.lat !== undefined ||
+      validated.lng !== undefined ||
       validated.tipOglasa !== undefined ||
       validated.make !== undefined ||
       validated.model !== undefined ||
@@ -897,6 +907,8 @@ router.post('/', createAdLimiter as any, authenticate as any, (async (req: Reque
           kategorija: validated.kategorija,
           potkategorija: validated.potkategorija ?? undefined,
           lokacija: validated.lokacija,
+          lat: validated.lat ?? undefined,
+          lng: validated.lng ?? undefined,
           status: AdStatus.NA_CEKANJU,
           vlasnikId: userId,
           expiresAt: expiresAt,

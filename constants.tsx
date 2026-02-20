@@ -21,6 +21,7 @@ export const CATEGORIES = [
   { id: 'sport', name: 'Sport i rekreacija', icon: '⚽', slug: 'sport-i-rekreacija' },
   { id: 'gradjevina', name: 'Građevina i alati', icon: '🏗️', slug: 'gradjevina-i-alati' },
   { id: 'pokloni_cvijece', name: 'Pokloni i cvijeće', icon: '🎁', slug: 'pokloni-i-cvijece' },
+  { id: 'za_djecu', name: 'Za djecu', icon: '🧸', slug: 'za-djecu' },
   { id: 'ostalo', name: 'Ostalo', icon: '📦', slug: 'ostalo' },
 ];
 
@@ -122,6 +123,75 @@ export const LOCATION_COORDS: Record<string, [number, number]> = {
 };
 
 export const STANJE_OPTIONS = ['Polovno', 'Novo', 'Oštećeno'];
+
+/** Tip dijela za kategoriju Auto dijelovi */
+export const AUTO_DIJELOVI_TIP = [
+  { id: 'motor', name: 'Motor' },
+  { id: 'transmisija', name: 'Transmisija' },
+  { id: 'felne', name: 'Felne i gume' },
+  { id: 'elektronika', name: 'Elektronika' },
+  { id: 'karoserija', name: 'Karoserija' },
+  { id: 'interijer', name: 'Interijer' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Tip za kategoriju Za djecu */
+export const ZA_DJECU_TIP = [
+  { id: 'odjeca', name: 'Odjeća' },
+  { id: 'obuca', name: 'Obuća' },
+  { id: 'igracke', name: 'Igračke' },
+  { id: 'kolica', name: 'Kolica i dječija vozila' },
+  { id: 'krevetac', name: 'Krevetac i posteljina' },
+  { id: 'skolski_pribor', name: 'Školski pribor' },
+  { id: 'sport_igra', name: 'Sport i igra' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Uzrast za kategoriju Za djecu */
+export const ZA_DJECU_UZRAST = [
+  { id: '0_6', name: '0–6 mjeseci' },
+  { id: '6_12', name: '6–12 mjeseci' },
+  { id: '1_3', name: '1–3 godine' },
+  { id: '3_6', name: '3–6 godina' },
+  { id: '6_12g', name: '6–12 godina' },
+  { id: '12_plus', name: '12+ godina' },
+];
+
+/** Način naplate za Usluge */
+export const USLUGE_NACIN_NAPLATE = [
+  { id: 'po_satu', name: 'Po satu' },
+  { id: 'po_danu', name: 'Po danu' },
+  { id: 'po_projektu', name: 'Po projektu' },
+  { id: 'dogovor', name: 'Dogovor' },
+];
+
+/** Tip za Bijela tehnika */
+export const BIJELA_TEHNIKA_TIP = [
+  { id: 'frizider', name: 'Frižider' },
+  { id: 'zamrzivac', name: 'Zamrzivač' },
+  { id: 'masina_pranje', name: 'Mašina za pranje' },
+  { id: 'susilica', name: 'Sušilica' },
+  { id: 'sporet', name: 'Šporet' },
+  { id: 'klima', name: 'Klima uređaj' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Energetska klasa za Bijela tehnika */
+export const BIJELA_TEHNIKA_ENERGIJA = ['A+++', 'A++', 'A+', 'A', 'B', 'C', 'Ostalo'];
+
+/** Tip za Namještaj */
+export const NAMJESTAJ_TIP = [
+  { id: 'sofa', name: 'Sofa' },
+  { id: 'krevet', name: 'Krevet' },
+  { id: 'stolica', name: 'Stolica' },
+  { id: 'stol', name: 'Stol' },
+  { id: 'ormar', name: 'Ormar' },
+  { id: 'polica', name: 'Polica' },
+  { id: 'ostalo', name: 'Ostalo' },
+];
+
+/** Materijal za Namještaj */
+export const NAMJESTAJ_MATERIJAL = ['Drvo', 'Metal', 'Plastika', 'Kombinacija'];
 
 export const MOTO_CATALOG: Record<string, string[]> = {
   "Honda": ["Africa Twin", "CB 500F", "CBR 600RR", "X-ADV", "Hornet", "PCX 125"],

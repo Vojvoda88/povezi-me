@@ -99,6 +99,8 @@ export interface Ad {
   potkategorija: string;
   cijena: number;
   lokacija: string;
+  lat?: number | null;
+  lng?: number | null;
   slike: string[];
   // Thumbnail verzije (za listing); fallback na full url ako nema thumb-a
   slikeThumbs?: string[];

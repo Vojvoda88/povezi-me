@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
 const CATEGORY_IDS = [
   'motorna_vozila', 'auto_dijelovi', 'nekretnine', 'tehnika', 'bijela_tehnika',
   'namjestaj', 'poljoprivreda', 'usluge', 'kucni_ljubimci',
-  'moda', 'poslovi', 'sport', 'gradjevina', 'pokloni_cvijece', 'ostalo'
+  'moda', 'poslovi', 'sport', 'gradjevina', 'pokloni_cvijece', 'za_djecu', 'ostalo'
 ];
 
 const MOTORNA_VOZILA_POTKATEGORIJE = ['automobili', 'motocikli', 'kamioni', 'traktori', 'cetvorotockasi'] as const;
@@ -39,6 +39,7 @@ const SAMPLE_TITLES: Record<string, string[]> = {
   sport: ['Bicikl trek', 'Štapovi za skijanje', 'Lopta košarka', 'Reket tenis', 'Roleri'],
   gradjevina: ['Cigla 500 kom', 'Cement', 'Pijesak', 'Alatnica set', 'Bormašina'],
   pokloni_cvijece: ['Buket ruža', 'Poklon košara', 'Saksija orhideja', 'Čokolada i cvijeće', 'Balon aranžman'],
+  za_djecu: ['Kombinezoni za bebe', 'Bicikl dječiji', 'Kolica za bebe', 'Igračke LEGO', 'Školski ranac'],
   ostalo: ['Stvari za poklon', 'Kolekcionarski predmet', 'Antikvitet', 'Razno'],
   auto_dijelovi: ['Gume zimske', 'Akumulator', 'Sjenila', 'Felge aluminijumske', 'Retrovizor']
 };

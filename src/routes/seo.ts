@@ -26,7 +26,7 @@ const generateSitemap = async () => {
     'motorna-vozila', 'auto-dijelovi', 'nekretnine', 'tehnika',
     'bijela-tehnika', 'namjestaj', 'moda', 'poslovi', 'usluge',
     'poljoprivreda', 'kucni-ljubimci', 'sport-i-rekreacija',
-    'gradjevina-i-alati', 'pokloni-i-cvijece', 'ostalo'
+    'gradjevina-i-alati', 'pokloni-i-cvijece', 'za-djecu', 'ostalo'
   ];
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

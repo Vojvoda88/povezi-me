@@ -147,6 +147,9 @@ export const mapApiAdToAd = (raw: any): Ad => {
   const vlasnikId = a.vlasnikId != null ? String(a.vlasnikId) : (a.vlasnik?.id != null ? String(a.vlasnik.id) : '');
   const status = (a.status && typeof a.status === 'string') ? a.status : 'AKTIVAN';
 
+  const lat = a.lat != null && typeof a.lat === 'number' && Number.isFinite(a.lat) ? a.lat : undefined;
+  const lng = a.lng != null && typeof a.lng === 'number' && Number.isFinite(a.lng) ? a.lng : undefined;
+
   return {
     ...a,
     id,
@@ -166,6 +169,8 @@ export const mapApiAdToAd = (raw: any): Ad => {
     kontaktIme,
     kontaktTelefon,
     glavnaSlikaIndex: 0,
+    lat: lat ?? undefined,
+    lng: lng ?? undefined,
     pogledi: typeof a.pogledi === 'number' ? a.pogledi : 0,
     isPaid: isPremium,
     promotionStatus: isPremium ? 'active' : 'none',

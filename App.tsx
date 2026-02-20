@@ -36,7 +36,10 @@ import {
   LOCATIONS, INITIAL_NOTIFICATIONS, MOTO_CATALOG, VEHICLE_FIELDS_CONFIG, STANJE_OPTIONS,
   TIP_OGLASA_OPTIONS, TIP_OGLASA_USLUGE, NEKRETNINE_TIP_PONUDE, NEKRETNINE_BROJ_SOBA,
   NEKRETNINE_TIP, NEKRETNINE_SPRAT, NEKRETNINE_TIP_FIELDS, NEKRETNINE_AMENITIES,
-  MOTORNA_VOZILA_ID, MOTORNA_VOZILA_SUBCATEGORIES
+  MOTORNA_VOZILA_ID, MOTORNA_VOZILA_SUBCATEGORIES,
+  AUTO_DIJELOVI_TIP, ZA_DJECU_TIP, ZA_DJECU_UZRAST,
+  USLUGE_NACIN_NAPLATE, BIJELA_TEHNIKA_TIP, BIJELA_TEHNIKA_ENERGIJA,
+  NAMJESTAJ_TIP, NAMJESTAJ_MATERIJAL
 } from './constants';
 import { AUTOMOTIVE_CATALOG } from './automotiveCatalog';
 import { getFallbackMakeItems, getFallbackModelItems, hasFallbackCatalog } from './vehicleFallbackCatalogs';
@@ -44,6 +47,8 @@ import { FixedSizeList as VirtualList } from 'react-window';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { EmptyState } from './components/EmptyState';
 const MarketplaceMap = React.lazy(() => import('./components/MarketplaceMap').then(m => ({ default: m.MarketplaceMap })));
+const MapLocationPicker = React.lazy(() => import('./components/MapLocationPicker').then(m => ({ default: m.MapLocationPicker })));
+const AdDetailMap = React.lazy(() => import('./components/AdDetailMap').then(m => ({ default: m.AdDetailMap })));
 import { FormField } from './components/FormField';
 import { WelcomeScreen } from './components/WelcomeScreen';
 
@@ -2378,7 +2383,7 @@ const AdCard = React.memo(AdCardInner);
 
 const SpecGrid = ({ details }: { details: any }) => {
   if (!details || typeof details !== 'object') return null;
-  const specs = [];
+  const specs: { label: string; value: string }[] = [];
   if (details.marka) specs.push({ label: 'Marka', value: details.marka });
   if (details.model) specs.push({ label: 'Model', value: details.model });
   if (details.godiste) specs.push({ label: 'Godište', value: `${details.godiste}. god` });
@@ -2392,7 +2397,16 @@ const SpecGrid = ({ details }: { details: any }) => {
   if (details.karoserija) specs.push({ label: 'Karoserija', value: details.karoserija });
   if (details.pogon) specs.push({ label: 'Pogon', value: details.pogon });
   if (details.stanje) specs.push({ label: 'Stanje', value: details.stanje });
-  if (details.tip) specs.push({ label: 'Tip', value: details.tip });
+  if (details.tip) {
+    const tipLabel = BIJELA_TEHNIKA_TIP.find(t => t.id === details.tip)?.name || NAMJESTAJ_TIP.find(t => t.id === details.tip)?.name || ZA_DJECU_TIP.find(t => t.id === details.tip)?.name || details.tip;
+    specs.push({ label: 'Tip', value: tipLabel });
+  }
+  if (details.tipDijela) specs.push({ label: 'Tip dijela', value: AUTO_DIJELOVI_TIP.find(t => t.id === details.tipDijela)?.name || details.tipDijela });
+  if (details.nacinNaplate) specs.push({ label: 'Način naplate', value: USLUGE_NACIN_NAPLATE.find(t => t.id === details.nacinNaplate)?.name || details.nacinNaplate });
+  if (details.energetskaKlasa) specs.push({ label: 'Energetska klasa', value: details.energetskaKlasa });
+  if (details.materijal) specs.push({ label: 'Materijal', value: details.materijal });
+  if (details.uzrast) specs.push({ label: 'Uzrast', value: ZA_DJECU_UZRAST.find(u => u.id === details.uzrast)?.name || details.uzrast });
+  if (details.velicina) specs.push({ label: 'Veličina', value: details.velicina });
   return (<>{specs.map((s, i) => (<div key={i} className="bg-[#131C2B] border border-white/5 p-4 rounded-2xl flex flex-col gap-1 hover:border-[#4F6DFF]/30 group transition-all"><span className="text-[8px] font-black uppercase text-[#9CA3AF] tracking-widest group-hover:text-[#4F6DFF]">{s.label}</span><span className="text-xs font-bold text-[#F3F4F6] truncate">{s.value}</span></div>))}</>);
 };
 
@@ -2634,6 +2648,14 @@ export const AdDetailView: React.FC<{
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#9CA3AF]">Opis</h3>
             <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{ad.opis || '—'}</p>
             {ad.lokacija && <p className="text-[10px] font-bold uppercase flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}><MapPin className="w-3 h-3" /> {ad.lokacija}</p>}
+            {typeof ad.lat === 'number' && typeof ad.lng === 'number' && Number.isFinite(ad.lat) && Number.isFinite(ad.lng) && (
+              <div>
+                <p className="text-[10px] font-black uppercase text-[#9CA3AF] mb-2">Lokacija na mapi</p>
+                <React.Suspense fallback={<div className="h-[200px] rounded-xl bg-[#0B1220] animate-pulse" />}>
+                  <AdDetailMap lat={ad.lat} lng={ad.lng} height={200} />
+                </React.Suspense>
+              </div>
+            )}
           </div>
         </div>
         <div className="lg:col-span-4">
@@ -3484,13 +3506,14 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
   const [duplicateSlug, setDuplicateSlug] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const submitErrorRef = useRef<HTMLDivElement>(null);
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(null);
   const [formData, setFormData] = useState<any>({
     naslov: '', cijena: '', opis: '', lokacija: 'Podgorica', telefon: user?.telefon || '',
     imePrezime: user?.ime || '',
     premium: false, instagram: '', facebook: '', viber: '', whatsapp: '',
     tipOglasa: 'prodajem',
     realEstateDetails: { tipNekretnine: '', tipPonude: 'prodaja', kvadratura: '', brojSoba: '', sprat: '' },
-    details: { stanje: 'Polovno' },
+    details: { stanje: 'Polovno', tipDijela: '', nacinNaplate: '', tipBijela: '', energetskaKlasa: '', tipNamjestaj: '', materijal: '', tipZaDjecu: '', uzrast: '', velicina: '' },
     vehicleDetails: {},
     carDetails: { marka: '', model: '', godiste: '', kilometraza: '', gorivo: '', mjenjac: '', karoserija: '', pogon: '', snaga: '', kubikaza: '', stanje: 'Polovno' },
     motoDetails: { marka: '', model: '', godiste: '', kilometraza: '', kubikaza: '', gorivo: '', mjenjac: '', tip: '', snagaKW: '', stanje: 'Polovno' }
@@ -3700,7 +3723,26 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       floorplanUrl: (red?.floorplanUrl && String(red.floorplanUrl).trim()) || undefined,
       virtualTourUrl: (red?.virtualTourUrl && String(red.virtualTourUrl).trim()) || undefined,
     } : undefined;
-    const baseDetails = category === 'auto_dijelovi' ? { stanje: formData.details?.stanje || 'Polovno' } : (realEstateDetails as Record<string, unknown> | undefined);
+    let baseDetails: Record<string, unknown> | undefined = realEstateDetails as Record<string, unknown> | undefined;
+    if (category === 'auto_dijelovi') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipDijela) baseDetails.tipDijela = formData.details.tipDijela;
+    } else if (category === 'usluge' && formData.details?.nacinNaplate) {
+      baseDetails = { nacinNaplate: formData.details.nacinNaplate };
+    } else if (category === 'bijela_tehnika') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipBijela) baseDetails.tip = formData.details.tipBijela;
+      if (formData.details?.energetskaKlasa) baseDetails.energetskaKlasa = formData.details.energetskaKlasa;
+    } else if (category === 'namjestaj') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipNamjestaj) baseDetails.tip = formData.details.tipNamjestaj;
+      if (formData.details?.materijal) baseDetails.materijal = formData.details.materijal;
+    } else if (category === 'za_djecu') {
+      baseDetails = { stanje: formData.details?.stanje || 'Polovno' };
+      if (formData.details?.tipZaDjecu) baseDetails.tip = formData.details.tipZaDjecu;
+      if (formData.details?.uzrast) baseDetails.uzrast = formData.details.uzrast;
+      if (formData.details?.velicina) baseDetails.velicina = formData.details.velicina;
+    }
     const contactDetails: Record<string, unknown> = { ...(baseDetails || {}) };
     contactDetails.imeProdavca = imePrezime;
     contactDetails.telefonProdavca = telefon;
@@ -3753,6 +3795,7 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
       cijena: Number(cijena),
       kategorija: category,
       lokacija: formData.lokacija,
+      ...(latLng && { lat: latLng.lat, lng: latLng.lng }),
       potkategorija: isMotornaVozila && vehicleSubcategory ? vehicleSubcategory : undefined,
       tipOglasa,
       details: details || undefined,
@@ -3908,12 +3951,17 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Lokacija</label>
-              <select value={formData.lokacija} onChange={e => setFormData({...formData, lokacija: e.target.value})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+              <select value={formData.lokacija} onChange={e => { setFormData({...formData, lokacija: e.target.value}); setLatLng(null); }} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
                 {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="md:col-span-2">
+            <React.Suspense fallback={<div className="h-[200px] rounded-xl bg-[#0B1220] animate-pulse" />}>
+              <MapLocationPicker lokacija={formData.lokacija} value={latLng} onChange={setLatLng} height={220} />
+            </React.Suspense>
+          </div>
+          <div className="space-y-2 md:col-span-2">
             <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Opis</label>
             <textarea placeholder="Opis oglasa..." rows={5} value={formData.opis} onChange={e => setFormData({...formData, opis: e.target.value})} className="w-full bg-[#0B1220] border border-white/5 rounded-2xl p-6 text-sm text-white outline-none focus:border-[#4F6DFF]" />
           </div>
@@ -4023,6 +4071,116 @@ const AddAd: React.FC<{ user: User | null, onAddAd: (ad: Ad) => void, onPublishS
             <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Auto dijelovi</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip dijela</label>
+                <select value={formData.details?.tipDijela || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipDijela: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {AUTO_DIJELOVI_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'usluge' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Usluge</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Način naplate</label>
+                <select value={formData.details?.nacinNaplate || ''} onChange={e => setFormData({...formData, details: {...formData.details, nacinNaplate: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {USLUGE_NACIN_NAPLATE.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'bijela_tehnika' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Bijela tehnika</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipBijela || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipBijela: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {BIJELA_TEHNIKA_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Energetska klasa</label>
+                <select value={formData.details?.energetskaKlasa || ''} onChange={e => setFormData({...formData, details: {...formData.details, energetskaKlasa: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {BIJELA_TEHNIKA_ENERGIJA.map(klasa => (<option key={klasa} value={klasa}>{klasa}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'namjestaj' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Namještaj</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipNamjestaj || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipNamjestaj: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {NAMJESTAJ_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Materijal</label>
+                <select value={formData.details?.materijal || ''} onChange={e => setFormData({...formData, details: {...formData.details, materijal: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {NAMJESTAJ_MATERIJAL.map(m => (<option key={m} value={m}>{m}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
+                <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {category === 'za_djecu' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl shadow-2xl space-y-6">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF] tracking-[0.2em]">Za djecu</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label>
+                <select value={formData.details?.tipZaDjecu || ''} onChange={e => setFormData({...formData, details: {...formData.details, tipZaDjecu: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {ZA_DJECU_TIP.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Uzrast</label>
+                <select value={formData.details?.uzrast || ''} onChange={e => setFormData({...formData, details: {...formData.details, uzrast: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
+                  <option value="">—</option>
+                  {ZA_DJECU_UZRAST.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Veličina (opciono)</label>
+                <input type="text" value={formData.details?.velicina || ''} onChange={e => setFormData({...formData, details: {...formData.details, velicina: e.target.value}})} placeholder="npr. 86, S, M" className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]" />
+              </div>
+              <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label>
                 <select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({...formData, details: {...formData.details, stanje: e.target.value}})} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white outline-none focus:border-[#4F6DFF]">
                   {STANJE_OPTIONS.map(s => (<option key={s} value={s}>{s}</option>))}
@@ -4101,6 +4259,7 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
   const [loading, setLoading] = useState(true);
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(null);
   const [formData, setFormData] = useState<any>({ naslov: '', opis: '', cijena: '', lokacija: 'Podgorica', tipOglasa: 'prodajem', realEstateDetails: {}, details: {} });
   const [images, setImages] = useState<EditImageItem[]>([]);
   const [failedImageUrls, setFailedImageUrls] = useState<Set<string>>(new Set());
@@ -4118,6 +4277,19 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
         if (!raw) { setAd(null); return; }
         const mapped = mapApiAdToAd(raw);
         setAd(mapped);
+        const d = (mapped.details || {}) as Record<string, unknown>;
+        const detailsForForm = {
+          stanje: d.stanje || 'Polovno',
+          tipDijela: d.tipDijela || '',
+          nacinNaplate: d.nacinNaplate || '',
+          tipBijela: d.tip || '',
+          energetskaKlasa: d.energetskaKlasa || '',
+          tipNamjestaj: d.tip || '',
+          materijal: d.materijal || '',
+          tipZaDjecu: d.tip || '',
+          uzrast: d.uzrast || '',
+          velicina: d.velicina || ''
+        };
         setFormData({
           naslov: mapped.naslov,
           opis: mapped.opis,
@@ -4125,8 +4297,10 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
           lokacija: mapped.lokacija || 'Podgorica',
           tipOglasa: mapped.tipOglasa || 'prodajem',
           realEstateDetails: mapped.realEstateDetails || { tipNekretnine: '', tipPonude: 'prodaja', kvadratura: '', brojSoba: '', sprat: '' },
-          details: mapped.details || { stanje: 'Polovno' }
+          details: detailsForForm
         });
+        const hasCoords = typeof raw?.lat === 'number' && typeof raw?.lng === 'number' && Number.isFinite(raw.lat) && Number.isFinite(raw.lng);
+        setLatLng(hasCoords ? { lat: raw.lat, lng: raw.lng } : null);
         setImages((mapped.slike || []).map((url: string) => ({ type: 'url' as const, url })));
       })
       .catch(() => setAd(null))
@@ -4214,15 +4388,39 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
 
     setSubmitLoading(true);
     try {
-      const body = {
+      let detailsPayload: Record<string, unknown> | undefined;
+      if (ad.kategorija === 'nekretnine' && formData.realEstateDetails && Object.keys(formData.realEstateDetails).length) {
+        detailsPayload = formData.realEstateDetails;
+      } else if (ad.kategorija === 'auto_dijelovi') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipDijela) detailsPayload.tipDijela = formData.details.tipDijela;
+      } else if (ad.kategorija === 'usluge' && formData.details?.nacinNaplate) {
+        detailsPayload = { nacinNaplate: formData.details.nacinNaplate };
+      } else if (ad.kategorija === 'bijela_tehnika') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipBijela) detailsPayload.tip = formData.details.tipBijela;
+        if (formData.details?.energetskaKlasa) detailsPayload.energetskaKlasa = formData.details.energetskaKlasa;
+      } else if (ad.kategorija === 'namjestaj') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipNamjestaj) detailsPayload.tip = formData.details.tipNamjestaj;
+        if (formData.details?.materijal) detailsPayload.materijal = formData.details.materijal;
+      } else if (ad.kategorija === 'za_djecu') {
+        detailsPayload = { stanje: formData.details?.stanje || 'Polovno' };
+        if (formData.details?.tipZaDjecu) detailsPayload.tip = formData.details.tipZaDjecu;
+        if (formData.details?.uzrast) detailsPayload.uzrast = formData.details.uzrast;
+        if (formData.details?.velicina) detailsPayload.velicina = formData.details.velicina;
+      }
+      const body: Record<string, unknown> = {
         naslov,
         opis,
         cijena: Number(cijena),
         lokacija: formData.lokacija,
         tipOglasa: formData.tipOglasa === 'trazim' ? 'trazim' : 'prodajem',
-        details: ad.kategorija === 'nekretnine' ? (formData.realEstateDetails && Object.keys(formData.realEstateDetails).length ? formData.realEstateDetails : undefined) : ad.kategorija === 'auto_dijelovi' ? formData.details : undefined,
+        details: detailsPayload,
         images: imagePayloads,
       };
+      const hadCoords = typeof ad.lat === 'number' && typeof ad.lng === 'number';
+      if (latLng) { body.lat = latLng.lat; body.lng = latLng.lng; } else if (hadCoords) { body.lat = null; body.lng = null; }
       const res = await fetch(`${API_BASE}/ads/my/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -4288,7 +4486,12 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2"><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Naslov *</label><input required value={formData.naslov} onChange={e => setFormData({ ...formData, naslov: e.target.value })} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white mt-2" /></div>
             <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Cijena (€) *</label><input required type="number" min={0} step="0.01" value={formData.cijena} onChange={e => setFormData({ ...formData, cijena: e.target.value })} placeholder="npr. 1500" className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white mt-2" /></div>
-            <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Lokacija</label><select value={formData.lokacija} onChange={e => setFormData({ ...formData, lokacija: e.target.value })} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white mt-2">{LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+            <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Lokacija</label><select value={formData.lokacija} onChange={e => { setFormData({ ...formData, lokacija: e.target.value }); setLatLng(null); }} className="w-full h-14 bg-[#0B1220] border border-white/5 rounded-2xl px-6 text-sm text-white mt-2">{LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}</select></div>
+          </div>
+          <div>
+            <React.Suspense fallback={<div className="h-[200px] rounded-xl bg-[#0B1220] animate-pulse" />}>
+              <MapLocationPicker lokacija={formData.lokacija} value={latLng} onChange={setLatLng} height={200} />
+            </React.Suspense>
           </div>
           <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Opis *</label><textarea required rows={5} value={formData.opis} onChange={e => setFormData({ ...formData, opis: e.target.value })} className="w-full bg-[#0B1220] border border-white/5 rounded-2xl p-6 text-sm text-white mt-2" /></div>
         </section>
@@ -4320,6 +4523,52 @@ const EditAd = ({ user, onSaved }: { user: User | null; onSaved?: () => void }) 
             </div>
             <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL tlocrtа</label><input type="url" value={formData.realEstateDetails?.floorplanUrl || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, floorplanUrl: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="https://..." /></div>
             <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">URL virtualne ture (Matterport, 360°)</label><input type="url" value={formData.realEstateDetails?.virtualTourUrl || ''} onChange={e => setFormData({ ...formData, realEstateDetails: { ...formData.realEstateDetails, virtualTourUrl: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="https://my.matterport.com/..." /></div>
+          </section>
+        )}
+        {ad.kategorija === 'auto_dijelovi' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Auto dijelovi</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip dijela</label><select value={formData.details?.tipDijela || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipDijela: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{AUTO_DIJELOVI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'usluge' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Usluge</h3>
+            <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Način naplate</label><select value={formData.details?.nacinNaplate || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, nacinNaplate: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{USLUGE_NACIN_NAPLATE.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+          </section>
+        )}
+        {ad.kategorija === 'bijela_tehnika' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Bijela tehnika</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipBijela || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipBijela: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{BIJELA_TEHNIKA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Energetska klasa</label><select value={formData.details?.energetskaKlasa || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, energetskaKlasa: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{BIJELA_TEHNIKA_ENERGIJA.map(klasa => <option key={klasa} value={klasa}>{klasa}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'namjestaj' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Namještaj</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipNamjestaj || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipNamjestaj: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{NAMJESTAJ_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Materijal</label><select value={formData.details?.materijal || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, materijal: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{NAMJESTAJ_MATERIJAL.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
+          </section>
+        )}
+        {ad.kategorija === 'za_djecu' && (
+          <section className="bg-[#131C2B] border border-white/5 p-8 rounded-xl space-y-4">
+            <h3 className="text-xs font-black uppercase text-[#9CA3AF]">Za djecu</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Tip</label><select value={formData.details?.tipZaDjecu || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, tipZaDjecu: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{ZA_DJECU_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Uzrast</label><select value={formData.details?.uzrast || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, uzrast: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{ZA_DJECU_UZRAST.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Veličina</label><input type="text" value={formData.details?.velicina || ''} onChange={e => setFormData({ ...formData, details: { ...formData.details, velicina: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1" placeholder="npr. 86, S" /></div>
+              <div><label className="text-[10px] font-black uppercase text-[#9CA3AF]">Stanje</label><select value={formData.details?.stanje || 'Polovno'} onChange={e => setFormData({ ...formData, details: { ...formData.details, stanje: e.target.value } })} className="w-full h-12 bg-[#0B1220] border border-white/5 rounded-xl px-4 text-sm text-white mt-1">{STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+            </div>
           </section>
         )}
         <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Izmjene će biti pregledane od administratora prije nego oglas ponovo postane aktivan na sajtu.</p>
