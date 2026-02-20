@@ -134,7 +134,17 @@ const DEFAULT_FILTERS = {
   brojCilindara: '',
   kabina: '',
   emisioniStandard: '',
+  tipDijela: '',
+  nacinNaplate: '',
+  tipBijela: '',
+  energetskaKlasa: '',
+  tipNamjestaj: '',
+  materijal: '',
+  tipZaDjecu: '',
+  uzrast: '',
 };
+
+const CATEGORIES_WITH_FILTER_PANEL = ['nekretnine', 'auto_dijelovi', 'usluge', 'bijela_tehnika', 'namjestaj', 'za_djecu'];
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Najnoviji (istaknuti prvo)' },
@@ -1234,8 +1244,18 @@ const Marketplace: React.FC<{
       const vehicleCount = keys.filter((k: string) => filters[k]).length;
       return common + vehicleCount;
     }
-    return common;
-  }, [isMotornaVozila, effectiveVehicleSubcategory, filters]);
+    const cat = activeCategory?.id;
+    const catFilterKeys: Record<string, string[]> = {
+      nekretnine: ['tip_nekretnine', 'tip_ponude', 'kvadraturaMin', 'broj_soba', 'sprat', 'amenities'],
+      auto_dijelovi: ['tipDijela', 'stanje'],
+      usluge: ['nacinNaplate'],
+      bijela_tehnika: ['tipBijela', 'energetskaKlasa', 'stanje'],
+      namjestaj: ['tipNamjestaj', 'materijal', 'stanje'],
+      za_djecu: ['tipZaDjecu', 'uzrast', 'stanje'],
+    };
+    const extra = (cat && catFilterKeys[cat]) ? catFilterKeys[cat].filter(k => filters[k]).length : 0;
+    return common + extra;
+  }, [isMotornaVozila, effectiveVehicleSubcategory, activeCategory?.id, filters]);
 
   const hasActiveSearch = useMemo(() => {
     if (searchQuery.trim()) return true;
@@ -1356,8 +1376,27 @@ const Marketplace: React.FC<{
       }
     }
 
-    if (activeCategory?.id === 'auto_dijelovi' && filters.stanje) {
-      result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+    if (activeCategory?.id === 'auto_dijelovi') {
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+      if (filters.tipDijela) result = result.filter(ad => (ad as any).details?.tipDijela === filters.tipDijela);
+    }
+    if (activeCategory?.id === 'usluge' && filters.nacinNaplate) {
+      result = result.filter(ad => (ad as any).details?.nacinNaplate === filters.nacinNaplate);
+    }
+    if (activeCategory?.id === 'bijela_tehnika') {
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+      if (filters.tipBijela) result = result.filter(ad => (ad as any).details?.tip === filters.tipBijela);
+      if (filters.energetskaKlasa) result = result.filter(ad => (ad as any).details?.energetskaKlasa === filters.energetskaKlasa);
+    }
+    if (activeCategory?.id === 'namjestaj') {
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+      if (filters.tipNamjestaj) result = result.filter(ad => (ad as any).details?.tip === filters.tipNamjestaj);
+      if (filters.materijal) result = result.filter(ad => (ad as any).details?.materijal === filters.materijal);
+    }
+    if (activeCategory?.id === 'za_djecu') {
+      if (filters.stanje) result = result.filter(ad => (ad as any).details?.stanje === filters.stanje);
+      if (filters.tipZaDjecu) result = result.filter(ad => (ad as any).details?.tip === filters.tipZaDjecu);
+      if (filters.uzrast) result = result.filter(ad => (ad as any).details?.uzrast === filters.uzrast);
     }
 
     const sortOrder = searchParams.get('sort') || '';
@@ -1592,11 +1631,11 @@ const Marketplace: React.FC<{
           </div>
         </div>
         <div className={`rounded-xl border overflow-hidden transition-all overflow-y-auto ${showFiltersOpen ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0'} lg:max-h-none lg:opacity-100`} style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-          {(isVehicleCategory && filterPanelCategory && (VEHICLE_FIELDS_CONFIG as any)[filterPanelCategory]) ? (
+          {((isVehicleCategory && filterPanelCategory && (VEHICLE_FIELDS_CONFIG as any)[filterPanelCategory]) || (activeCategory && CATEGORIES_WITH_FILTER_PANEL.includes(activeCategory.id))) ? (
             <div className="p-4 lg:p-5 border-l-4 flex flex-col lg:flex-row lg:items-end lg:gap-6 gap-4" style={{ borderLeftColor: 'var(--accent)' }}>
               <div className="flex-1 min-w-0">
                 <FilterPanel
-                  category={filterPanelCategory}
+                  category={filterPanelCategory || activeCategory?.id || ''}
                   initialFilters={filters}
                   apiBase={API_BASE}
                   onApply={(f) => {
@@ -2206,8 +2245,121 @@ const FilterPanel: React.FC<{ category: string, initialFilters: any, onApply: (f
             </div>
           </>
         )}
+
+        {/* AUTO DIJELOVI */}
+        {category === 'auto_dijelovi' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip dijela</label>
+              <select value={localFilters.tipDijela || ''} onChange={e => setLocalFilters({...localFilters, tipDijela: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {AUTO_DIJELOVI_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* USLUGE */}
+        {category === 'usluge' && (
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Način naplate</label>
+            <select value={localFilters.nacinNaplate || ''} onChange={e => setLocalFilters({...localFilters, nacinNaplate: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+              <option value="">Sve</option>
+              {USLUGE_NACIN_NAPLATE.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* BIJELA TEHNIKA */}
+        {category === 'bijela_tehnika' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipBijela || ''} onChange={e => setLocalFilters({...localFilters, tipBijela: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {BIJELA_TEHNIKA_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Energetska klasa</label>
+              <select value={localFilters.energetskaKlasa || ''} onChange={e => setLocalFilters({...localFilters, energetskaKlasa: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {BIJELA_TEHNIKA_ENERGIJA.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* NAMJEŠTAJ */}
+        {category === 'namjestaj' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipNamjestaj || ''} onChange={e => setLocalFilters({...localFilters, tipNamjestaj: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {NAMJESTAJ_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Materijal</label>
+              <select value={localFilters.materijal || ''} onChange={e => setLocalFilters({...localFilters, materijal: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {NAMJESTAJ_MATERIJAL.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {/* ZA DJECU */}
+        {category === 'za_djecu' && (
+          <>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Tip</label>
+              <select value={localFilters.tipZaDjecu || ''} onChange={e => setLocalFilters({...localFilters, tipZaDjecu: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {ZA_DJECU_TIP.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Uzrast</label>
+              <select value={localFilters.uzrast || ''} onChange={e => setLocalFilters({...localFilters, uzrast: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {ZA_DJECU_UZRAST.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Stanje</label>
+              <select value={localFilters.stanje || ''} onChange={e => setLocalFilters({...localFilters, stanje: e.target.value})} className="w-full h-12 border rounded-xl px-4 text-sm font-medium outline-none transition-colors" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}>
+                <option value="">Sve</option>
+                {STANJE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
         {/* DINAMIČKA POLJA (vozila i ostalo) */}
-        {fields && category !== 'nekretnine' && Object.entries(fields).map(([key, config]) => renderField(key, config))}
+        {fields && category !== 'nekretnine' && !CATEGORIES_WITH_FILTER_PANEL.includes(category) && Object.entries(fields).map(([key, config]) => renderField(key, config))}
       </div>
 
       <div className="flex flex-col sm:flex-row items-center gap-3 pt-5 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
