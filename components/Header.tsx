@@ -59,7 +59,7 @@ export const Header: React.FC<{
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 border-b z-[1000] h-16 lg:h-20 flex items-center transition-colors" style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)' }}>
+    <nav className="povezi-header-safe fixed top-0 left-0 right-0 border-b z-[1000] flex items-center transition-colors" style={{ backgroundColor: 'var(--bg-nav)', borderColor: 'var(--border-subtle)' }}>
       <div className="max-w-7xl mx-auto px-4 w-full flex justify-between items-center">
         <Link to="/"><Logo /></Link>
         <div className={`flex-grow max-w-xl mx-4 lg:mx-8 ${mobileSearchOpen ? 'block' : 'hidden'} lg:block`}>

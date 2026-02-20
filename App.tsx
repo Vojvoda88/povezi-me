@@ -478,7 +478,7 @@ const AppContent: React.FC = () => {
       <div className="min-h-[100dvh] flex flex-col overflow-x-hidden font-inter" style={{ backgroundColor: 'var(--bg-page)', color: 'var(--text-primary)' }}>
         <WelcomeScreen />
         <Header user={currentUser} notifications={notifications} favoritesCount={favorites.length} onLogout={handleLogout} theme={theme} onThemeChange={setTheme} mobileSearchOpen={mobileSearchOpen} onMobileSearchOpenChange={setMobileSearchOpen} pendingAdminCount={pendingAdminCount} />
-        <main className="flex-grow flex flex-col min-h-0 pt-16 lg:pt-24 pb-24 lg:pb-0">
+        <main className="povezi-main-pt flex-grow flex flex-col min-h-0 pb-24 lg:pb-0">
           <div data-scroll-root className="flex-1 overflow-y-auto min-h-0">
           <Routes>
             <Route path="/mobile-preview" element={<Navigate to="/?mobile=1" replace />} />

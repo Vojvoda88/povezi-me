@@ -168,6 +168,25 @@
       box-shadow: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
     }
 
+    /* Header – safe area za iPhone notch/Dynamic Island (vrijeme, baterija) */
+    .povezi-header-safe {
+      padding-top: env(safe-area-inset-top);
+      padding-left: max(env(safe-area-inset-left), 0px);
+      padding-right: max(env(safe-area-inset-right), 0px);
+      min-height: calc(env(safe-area-inset-top, 0px) + 4rem);
+    }
+    @media (min-width: 1024px) {
+      .povezi-header-safe { min-height: calc(env(safe-area-inset-top, 0px) + 5rem); }
+    }
+
+    /* Main padding ispod headera – safe area za iPhone notch/Dynamic Island */
+    .povezi-main-pt {
+      padding-top: calc(env(safe-area-inset-top, 0px) + 4rem);
+    }
+    @media (min-width: 1024px) {
+      .povezi-main-pt { padding-top: calc(env(safe-area-inset-top, 0px) + 6rem); }
+    }
+
     /* Leaflet tooltip u tamnoj temi */
     .leaflet-tooltip-dark {
       background: var(--bg-card) !important;
