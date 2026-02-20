@@ -1,7 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { LOCATION_COORDS } from '../constants';
 
-/** Opcioni map picker – korisnik klikne da postavi tačnu lokaciju. Vraća { lat, lng } ili null. */
+/** Geocoding pomoću OpenStreetMap Nominatim (besplatno, bez API ključa). */
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const q = encodeURIComponent(address.trim() + ', Crna Gora');
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'PoveziME-Marketplace/1.0',
+    },
+  });
+  const data = await res.json().catch(() => []);
+  if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  }
+  return null;
+}
+
+/** Opcioni map picker – korisnik unosi adresu ili klikne da postavi tačnu lokaciju. Vraća { lat, lng } ili null. */
 export const MapLocationPicker: React.FC<{
   lokacija: string;
   value: { lat: number; lng: number } | null;
@@ -11,10 +28,37 @@ export const MapLocationPicker: React.FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const iconRef = useRef<any>(null);
+  const LRef = useRef<any>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addressQuery, setAddressQuery] = useState('');
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   const center = (LOCATION_COORDS[lokacija] || LOCATION_COORDS['Podgorica']) as [number, number];
+
+  const handleSearchAddress = async () => {
+    const q = addressQuery.trim();
+    if (!q) return;
+    setGeocodeError(null);
+    setGeocodeLoading(true);
+    try {
+      const coords = await geocodeAddress(q);
+      if (coords) {
+        onChange(coords);
+        if (mapRef.current) {
+          mapRef.current.setView([coords.lat, coords.lng], 16);
+        }
+      } else {
+        setGeocodeError('Adresa nije pronađena. Pokušajte drugačiji unos ili kliknite na mapu.');
+      }
+    } catch {
+      setGeocodeError('Greška pri pretrazi. Pokušajte ponovo.');
+    } finally {
+      setGeocodeLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined' || !containerRef.current) return;
@@ -23,6 +67,7 @@ export const MapLocationPicker: React.FC<{
     import('leaflet')
       .then((mod) => {
         const L = mod.default;
+        LRef.current = L;
         if (cancelled || !containerRef.current) return;
         const map = L.map(containerRef.current, { zoomControl: false }).setView(
           value ? [value.lat, value.lng] : center,
@@ -41,6 +86,7 @@ export const MapLocationPicker: React.FC<{
           iconSize: [28, 28],
           iconAnchor: [14, 14],
         });
+        iconRef.current = icon;
 
         if (value) {
           const m = L.marker([value.lat, value.lng], { icon }).addTo(map);
@@ -75,13 +121,22 @@ export const MapLocationPicker: React.FC<{
   }, [lokacija]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!ready || !mapRef.current || !markerRef.current) return;
+    if (!ready || !mapRef.current) return;
+    const L = LRef.current;
+    const icon = iconRef.current;
     if (value) {
-      markerRef.current.setLatLng([value.lat, value.lng]);
+      if (markerRef.current) {
+        markerRef.current.setLatLng([value.lat, value.lng]);
+      } else if (L && icon) {
+        const m = L.marker([value.lat, value.lng], { icon }).addTo(mapRef.current);
+        markerRef.current = m;
+      }
       mapRef.current.setView([value.lat, value.lng], 15);
     } else {
-      markerRef.current.remove();
-      markerRef.current = null;
+      if (markerRef.current) {
+        markerRef.current.remove();
+        markerRef.current = null;
+      }
       mapRef.current.setView(center, 12);
     }
   }, [value, ready, center]);
@@ -117,7 +172,32 @@ export const MapLocationPicker: React.FC<{
           </button>
         )}
       </div>
-      <p className="text-[10px] text-[#9CA3AF]">Kliknite na mapu da postavite tačnu lokaciju. Ako ne odaberete, koristit će se centar grada.</p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Unesite adresu (npr. Njegoševa 12, Podgorica)..."
+          value={addressQuery}
+          onChange={(e) => {
+            setAddressQuery(e.target.value);
+            setGeocodeError(null);
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSearchAddress())}
+          className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4F6DFF]/50"
+          style={{ borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-card)' }}
+          disabled={geocodeLoading}
+        />
+        <button
+          type="button"
+          onClick={handleSearchAddress}
+          disabled={geocodeLoading || !addressQuery.trim()}
+          className="flex items-center gap-2 rounded-lg bg-[#4F6DFF] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#3d5ae0] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Search size={16} />
+          {geocodeLoading ? 'Tražim...' : 'Pronađi'}
+        </button>
+      </div>
+      {geocodeError && <p className="text-xs text-amber-500">{geocodeError}</p>}
+      <p className="text-[10px] text-[#9CA3AF]">Unesite adresu da vam mapu prebaci na to mjesto, ili kliknite na mapu da postavite tačnu lokaciju.</p>
       <div
         ref={containerRef}
         className="w-full rounded-xl overflow-hidden border cursor-crosshair"
