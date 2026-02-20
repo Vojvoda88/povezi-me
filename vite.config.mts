@@ -42,11 +42,6 @@ export default defineConfig(() => {
           navigateFallback: '/index.html',
           runtimeCaching: [
             {
-              urlPattern: /^https:\/\/cdn\.tailwindcss\.com\/.*/i,
-              handler: 'CacheFirst',
-              options: { cacheName: 'tailwind-cdn', expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 30 } },
-            },
-            {
               urlPattern: /^https:\/\/fonts\.(gstatic|googleapis)\.com\/.*/i,
               handler: 'CacheFirst',
               options: { cacheName: 'google-fonts', expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 } },
