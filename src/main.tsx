@@ -11,6 +11,17 @@ if (typeof window !== 'undefined') {
   installRuntimeErrorGuard({ getApiBase });
 }
 
+// Keep-alive ping (production) to reduce cold starts.
+if (typeof window !== 'undefined' && (import.meta as any).env?.MODE === 'production') {
+  const ping = () => {
+    const base = getApiBase();
+    if (!base) return;
+    fetch(`${base.replace(/\/+$/, '')}/health`).catch(() => {});
+  };
+  ping();
+  window.setInterval(ping, 5 * 60 * 1000);
+}
+
 const dsn = typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SENTRY_DSN;
 let sentryEnabled = false;
 
