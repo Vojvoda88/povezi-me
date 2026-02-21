@@ -486,6 +486,27 @@ router.get('/mine', authenticate as any, (async (req: Request, res: Response) =>
 }) as any);
 
 /**
+ * GET ads by seller (javne aktivne) – samo prijavljeni korisnici
+ */
+router.get('/user/:id', authenticate as any, (async (req: Request, res: Response) => {
+  const r = req as any;
+  const s = res as any;
+  const sellerId = r.params.id;
+  if (!sellerId) return s.status(400).json({ error: 'ID prodavca je obavezan' });
+  try {
+    const ads = await prisma.ad.findMany({
+      where: { vlasnikId: sellerId, status: AdStatus.AKTIVAN, deletedAt: null, vlasnik: { shadowBanned: false } },
+      select: LISTING_SELECT,
+      orderBy: { createdAt: 'desc' },
+    });
+    s.json(ads.map(serializeListingAd));
+  } catch (err) {
+    console.error('Ads by seller error:', sellerId, err);
+    s.status(500).json({ error: 'Greška pri preuzimanju oglasa prodavca' });
+  }
+}) as any);
+
+/**
  * GET single ad by id (samo vlasnik – za uređivanje)
  */
 router.get('/my/:id', authenticate as any, (async (req: Request, res: Response) => {

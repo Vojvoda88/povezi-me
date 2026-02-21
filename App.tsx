@@ -488,7 +488,7 @@ const AppContent: React.FC = () => {
             {/* Fix: use toggleFavorite instead of undefined onToggleFavorite */}
             <Route path="/oglas/:slug" element={<AdDetail ads={ads} user={currentUser} onToggleFavorite={toggleFavorite} favorites={favorites} ratings={ratings} onAddRating={addRating} getSellerMetrics={getSellerMetrics} />} />
             {/* Fix: use toggleFavorite instead of undefined onToggleFavorite */}
-            <Route path="/prodavac/:userId" element={<PublicProfile ads={ads} favorites={favorites} onToggleFavorite={toggleFavorite} adsError={adsError} adsAreFallback={adsAreFallback} onRetryAds={refreshAds} />} />
+            <Route path="/prodavac/:userId" element={<RequireAuth><PublicProfile ads={ads} favorites={favorites} onToggleFavorite={toggleFavorite} adsError={adsError} adsAreFallback={adsAreFallback} onRetryAds={refreshAds} /></RequireAuth>} />
             <Route path="/obavjestenja" element={<RequireAuth><Notifications notifications={notifications} onMarkRead={handleMarkNotificationRead} onRefresh={fetchNotifications} /></RequireAuth>} />
             <Route path="/prijava" element={<Auth onLogin={(u) => setCurrentUser(mapApiUserToUser(u))} />} />
             <Route path="/registracija" element={<Navigate to="/prijava" replace />} />
@@ -2715,6 +2715,15 @@ export const AdDetailView: React.FC<{
                     )}
                     <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>{sellerAdsCount} oglasa od prodavca</span>
                   </div>
+                  {user && !isOwner && (
+                    <Link
+                      to={`/prodavac/${ad.vlasnikId}`}
+                      className="text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border"
+                      style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-card)' }}
+                    >
+                      Svi oglasi prodavca
+                    </Link>
+                  )}
                 </div>
                 {(() => {
                   const telefon = (ad.details as any)?.telefon ?? (ad.details as any)?.telefonProdavca ?? ad.kontaktTelefon;
@@ -2723,7 +2732,9 @@ export const AdDetailView: React.FC<{
                   const digitsOnly = (s: string) => s.replace(/\D/g, '');
                   const viberDigits = ((ad.details as any)?.viber != null && (ad.details as any)?.viber !== '') ? digitsOnly(String((ad.details as any).viber)) : digitsOnly(telefonNorm);
                   const viberNum = viberDigits ? (viberDigits.startsWith('382') ? viberDigits : '382' + viberDigits.replace(/^0/, '')) : '';
-                  const viberHref = viberNum ? `viber://chat?number=${viberNum}` : '';
+                  const adLink = typeof window !== 'undefined' ? window.location.href : '';
+                  const pratecaPoruka = `Zdravo! Zanima me ovaj oglas: ${ad.naslov || 'Oglas'} - ${adLink}`;
+                  const viberHref = viberNum ? `viber://chat?number=${viberNum}&text=${encodeURIComponent(pratecaPoruka)}` : '';
                   const whatsappRaw = (ad.details as any)?.whatsapp ?? (telefonNorm ? digitsOnly(telefonNorm) : null);
                   const whatsapp = whatsappRaw != null && digitsOnly(String(whatsappRaw)) !== '' ? (() => { const d = digitsOnly(String(whatsappRaw)); return d.startsWith('382') ? d : '382' + d.replace(/^0/, ''); })() : null;
                   return (
@@ -2741,12 +2752,12 @@ export const AdDetailView: React.FC<{
                       )}
                       {viberHref && (
                         <a href={viberHref} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#7360F2] hover:bg-[#6B56E8] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#7360F2]/25 active:scale-95 transition-all">
-                          <MessageCircle className="w-5 h-5" /> Pošalji poruku
+                          <MessageCircle className="w-5 h-5" /> Pošalji poruku na Viber
                         </a>
                       )}
                       {whatsapp && (
-                        <a href={`https://wa.me/${whatsapp.startsWith('382') ? whatsapp : '382' + whatsapp.replace(/^0/, '')}?text=${encodeURIComponent('Zdravo, zanima me ovaj oglas: ' + (typeof window !== 'undefined' ? window.location.href : ''))}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#25D366] hover:bg-[#22C55E] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#25D366]/25 active:scale-95 transition-all">
-                          <MessageCircle className="w-5 h-5" /> Kontaktiraj
+                        <a href={`https://wa.me/${whatsapp.startsWith('382') ? whatsapp : '382' + whatsapp.replace(/^0/, '')}?text=${encodeURIComponent(pratecaPoruka)}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#25D366] hover:bg-[#22C55E] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#25D366]/25 active:scale-95 transition-all">
+                          <MessageCircle className="w-5 h-5" /> Pošalji poruku na WhatsApp
                         </a>
                       )}
                     </>
@@ -2950,13 +2961,15 @@ const AdDetail: React.FC<{
   );
 };
 
-const PublicProfile: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: (id: string) => void, adsError?: string | null, adsAreFallback?: boolean, onRetryAds?: () => void }> = ({ ads, favorites, onToggleFavorite, adsError, adsAreFallback, onRetryAds }) => {
+const PublicProfile: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite: (id: string) => void, adsError?: string | null, adsAreFallback?: boolean, onRetryAds?: () => void }> = ({ ads: _ads, favorites, onToggleFavorite }) => {
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const sellerAds = useMemo(() => ads.filter(a => a.vlasnikId === userId), [ads, userId]);
+  const [sellerAds, setSellerAds] = useState<Ad[]>([]);
+  const [sellerLoading, setSellerLoading] = useState(false);
+  const [sellerError, setSellerError] = useState<string | null>(null);
   const sellerName = sellerAds.length > 0 ? sellerAds[0].kontaktIme : "Nepoznat prodavac";
-  const linksDisabled = !!adsError || !!adsAreFallback;
+  const linksDisabled = false;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2972,7 +2985,43 @@ const PublicProfile: React.FC<{ ads: Ad[], favorites: string[], onToggleFavorite
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [location.pathname, location.search]);
 
-  return (<div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-slide-up"><div className="flex items-center gap-4"><button onClick={() => navigate(-1)} className="p-2 bg-white/5 rounded-full text-white"><ChevronLeft className="w-6 h-6" /></button><div><h1 className="text-2xl font-black text-white uppercase tracking-widest">{sellerName}</h1><p className="text-[10px] text-[#9CA3AF] font-bold uppercase tracking-wider">{sellerAds.length} Aktivnih oglasa</p></div></div><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{sellerAds.map(ad => (<AdCard key={ad.id} ad={ad} isFavorite={favorites.includes(ad.id)} onToggleFavorite={onToggleFavorite} linksDisabled={linksDisabled} onFallbackClick={onRetryAds} debugAdsError={adsError} debugAdsAreFallback={adsAreFallback} imgWidth={400} />))}</div></div>);
+  useEffect(() => {
+    if (!userId) return;
+    const ctrl = new AbortController();
+    setSellerLoading(true);
+    setSellerError(null);
+    fetch(`${API_BASE}/ads/user/${encodeURIComponent(userId)}`, { headers: getAuthHeaders(), signal: ctrl.signal })
+      .then(res => res.ok ? res.json() : res.json().then((d: { error?: string }) => Promise.reject(d.error || 'Greška servera')))
+      .then((data: any[]) => setSellerAds((data || []).map(mapApiAdToAd)))
+      .catch((err) => { if (err?.name !== 'AbortError') setSellerError(String(err || 'Greška')); })
+      .finally(() => setSellerLoading(false));
+    return () => ctrl.abort();
+  }, [userId]);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-slide-up">
+      <div className="flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="p-2 bg-white/5 rounded-full text-white"><ChevronLeft className="w-6 h-6" /></button>
+        <div>
+          <h1 className="text-2xl font-black text-white uppercase tracking-widest">{sellerName}</h1>
+          <p className="text-[10px] text-[#9CA3AF] font-bold uppercase tracking-wider">{sellerAds.length} Aktivnih oglasa</p>
+        </div>
+      </div>
+      {sellerLoading && <div className="py-10 text-center text-[#9CA3AF]">Učitavanje oglasa...</div>}
+      {sellerError && <div className="py-6 text-center text-red-400">{sellerError}</div>}
+      {!sellerLoading && !sellerError && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {sellerAds.length === 0 ? (
+            <div className="col-span-full text-center text-[#9CA3AF]">Nema aktivnih oglasa.</div>
+          ) : (
+            sellerAds.map(ad => (
+              <AdCard key={ad.id} ad={ad} isFavorite={favorites.includes(ad.id)} onToggleFavorite={onToggleFavorite} linksDisabled={linksDisabled} imgWidth={400} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 type ApiConversation = {

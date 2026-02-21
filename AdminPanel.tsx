@@ -430,7 +430,14 @@ export const AdminAds: React.FC = () => {
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const [searchInput, setSearchInput] = useState(search);
+  const [promoToast, setPromoToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const promoToastRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSearch = useDebounce(searchInput, 300);
+  const showPromoToast = useCallback((msg: string, ok: boolean) => {
+    if (promoToastRef.current) clearTimeout(promoToastRef.current);
+    setPromoToast({ msg, ok });
+    promoToastRef.current = setTimeout(() => { setPromoToast(null); promoToastRef.current = null; }, 3500);
+  }, []);
   useEffect(() => {
     const p = new URLSearchParams(searchParams);
     if (debouncedSearch) p.set('search', debouncedSearch); else p.delete('search');
@@ -449,10 +456,14 @@ export const AdminAds: React.FC = () => {
     fetch(`${API_BASE}/admin/ads/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ status }) }).then(res => res.ok && refetch());
   };
   const feature = (id: string, plan: '7' | '14' | '30') => {
-    fetch(`${API_BASE}/admin/ads/${id}/feature`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ plan }) }).then(res => res.ok && refetch());
+    fetch(`${API_BASE}/admin/ads/${id}/feature`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ plan }) })
+      .then(res => res.json().then((d: { error?: string }) => ({ ok: res.ok, error: d.error })))
+      .then(({ ok, error }) => { if (ok) { refetch(); showPromoToast(`Promocija postavljena – ${plan} dana`, true); } else showPromoToast(error || 'Greška', false); });
   };
   const removeFeature = (id: string) => {
-    fetch(`${API_BASE}/admin/ads/${id}/feature`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ removePromo: true }) }).then(res => res.ok && refetch());
+    fetch(`${API_BASE}/admin/ads/${id}/feature`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ removePromo: true }) })
+      .then(res => res.json().then((d: { error?: string }) => ({ ok: res.ok, error: d.error })))
+      .then(({ ok, error }) => { if (ok) { refetch(); showPromoToast('Promocija uklonjena', true); } else showPromoToast(error || 'Greška', false); });
   };
   const deleteAd = (id: string) => {
     if (!window.confirm('Obrisati oglas?')) return;
@@ -466,6 +477,11 @@ export const AdminAds: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {promoToast && (
+        <div className={`rounded-xl px-4 py-3 font-bold text-sm ${promoToast.ok ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50'}`} role="status">
+          {promoToast.ok ? '✓ ' : '⚠ '}{promoToast.msg}
+        </div>
+      )}
       <h1 className="text-2xl font-black uppercase tracking-widest">Oglasi</h1>
       <div className="flex flex-wrap gap-2">
         <input type="text" placeholder="Pretraga (naslov, email)" value={searchInput} onChange={e => setSearchInput(e.target.value)} className="h-10 rounded-xl px-4 text-sm border w-48" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} />
