@@ -2460,6 +2460,7 @@ export const AdDetailView: React.FC<{
   const [proxyFailedUrls, setProxyFailedUrls] = useState<Set<string>>(new Set());
   const [fullyFailedUrls, setFullyFailedUrls] = useState<Set<string>>(new Set());
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
+  const [viberCopied, setViberCopied] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
@@ -2735,6 +2736,18 @@ export const AdDetailView: React.FC<{
                   const adLink = typeof window !== 'undefined' ? window.location.href : '';
                   const pratecaPoruka = `Zdravo! Zanima me ovaj oglas: ${ad.naslov || 'Oglas'} - ${adLink}`;
                   const viberHref = viberNum ? `viber://chat?number=${viberNum}&text=${encodeURIComponent(pratecaPoruka)}` : '';
+                  const handleViberClick = async (e: React.MouseEvent) => {
+                    if (!viberHref) return;
+                    e.preventDefault();
+                    try {
+                      if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(pratecaPoruka);
+                        setViberCopied(true);
+                        setTimeout(() => setViberCopied(false), 2500);
+                      }
+                    } catch {}
+                    window.location.href = viberHref;
+                  };
                   const whatsappRaw = (ad.details as any)?.whatsapp ?? (telefonNorm ? digitsOnly(telefonNorm) : null);
                   const whatsapp = whatsappRaw != null && digitsOnly(String(whatsappRaw)) !== '' ? (() => { const d = digitsOnly(String(whatsappRaw)); return d.startsWith('382') ? d : '382' + d.replace(/^0/, ''); })() : null;
                   return (
@@ -2751,9 +2764,16 @@ export const AdDetailView: React.FC<{
                         </>
                       )}
                       {viberHref && (
-                        <a href={viberHref} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#7360F2] hover:bg-[#6B56E8] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#7360F2]/25 active:scale-95 transition-all">
-                          <MessageCircle className="w-5 h-5" /> Pošalji poruku na Viber
-                        </a>
+                        <>
+                          <a href={viberHref} onClick={handleViberClick} className="w-full h-14 bg-[#7360F2] hover:bg-[#6B56E8] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#7360F2]/25 active:scale-95 transition-all">
+                            <MessageCircle className="w-5 h-5" /> Pošalji poruku na Viber
+                          </a>
+                          {viberCopied && (
+                            <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest text-center">
+                              Poruka kopirana – nalijepi u Viberu
+                            </div>
+                          )}
+                        </>
                       )}
                       {whatsapp && (
                         <a href={`https://wa.me/${whatsapp.startsWith('382') ? whatsapp : '382' + whatsapp.replace(/^0/, '')}?text=${encodeURIComponent(pratecaPoruka)}`} target="_blank" rel="noopener noreferrer" className="w-full h-14 bg-[#25D366] hover:bg-[#22C55E] text-white rounded-2xl flex items-center justify-center gap-3 font-black uppercase text-xs shadow-lg shadow-[#25D366]/25 active:scale-95 transition-all">
