@@ -38,6 +38,7 @@
     "e2e:headed": "node scripts/e2e-prepare.js && playwright test --headed",
     "prod:sanity": "node scripts/prod-sanity.js",
     "cleanup": "node scripts/cleanup-images.js",
+    "cleanup:orphan-tmp": "node scripts/cleanup-orphan-tmp.js",
     "import-ads": "ts-node scripts/import-ads.ts",
     "redis:check": "node scripts/redis-chat-check.js"
   },

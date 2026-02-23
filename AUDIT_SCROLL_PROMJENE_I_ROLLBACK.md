@@ -209,7 +209,7 @@ Preporuka za rollback: `35e6355` – aplicacija ima admin, slike, većinu fixova
 Revert commitova od najnovijeg prema najstarijem. Svaki revert je novi commit.
 
 ```bash
-cd "c:\Users\Jovan\Desktop\Sve novo"
+cd "c:\Users\Jovan\Desktop\PoveziME"
 
 # Revert od dc09301 do 35e6355 (isključivo) – 16 commitova
 git revert --no-commit dc09301 cef253f 6beabfb f520591 33db26a 4f9ec43 66e5777 713a32d
@@ -232,7 +232,7 @@ git push
 **Upozorenje:** Briše historiju. Samo ako nema drugih developera ili ako je repo samo tvoj.
 
 ```bash
-cd "c:\Users\Jovan\Desktop\Sve novo"
+cd "c:\Users\Jovan\Desktop\PoveziME"
 
 # Reset na last known good (35e6355)
 git reset --hard 35e6355

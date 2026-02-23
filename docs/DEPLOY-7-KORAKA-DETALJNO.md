@@ -16,7 +16,7 @@ Svaka stavka je raščlanjena u konkretne korake koje možeš pratiti redom.
 ## 1.2 Otvori terminal u folderu projekta
 
 - U VS Code / Cursor: **Terminal → New Terminal** (ili `Ctrl+`` `).
-- Ili: u Exploreru uđi u folder **"Sve novo"**, u adresnu traku ukucaj `cmd` pa Enter.
+- Ili: u Exploreru uđi u folder **"PoveziME"**, u adresnu traku ukucaj `cmd` pa Enter.
 
 ## 1.3 Ako već imaš Git i remote (repo na GitHubu)
 

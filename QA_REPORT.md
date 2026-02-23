@@ -181,16 +181,13 @@ Vjerovatno više faktora: (1) Vite proxy key `/api/` (sa trailing slash) mogao j
 | 3 | SPA fallback | README.md | Dodana sekcija: Production hosting mora servirati index.html za nepoznate rute |
 | 4 | AdDetail race condition | App.tsx | AbortController u loadAd; abortRef za cleanup; spriječen setState nakon unmount-a |
 | 5 | Search debounce | — | Nije potrebno: pretraga radi na form submit, ne na keypress; nema API spam |
-| 6 | Orphan images | v. dolje | TODO dokumentovan |
+| 6 | Orphan images | ✅ | Implementirano: deleteAdImagesFromStorage pri brisanju oglasa; cleanup:orphan-tmp za tmp upload-e |
 | 7 | Sentry monitoring | main.tsx, src/index.ts | Frontend: init ako VITE_SENTRY_DSN; Backend: init + captureException ako SENTRY_DSN; bez crasha ako DSN nije postavljen |
 
-### TODO: Orphan images (backend cleanup)
+### Orphan images (backend cleanup) – ✅ Implementirano
 
-Backend trenutno **ne briše** fajlove iz Supabase Storage kada:
-- korisnik prekine upload ili odustane od objave oglasa (uploadovane slike ostaju u storage)
-- oglas se obriše (Prisma CASCADE briše AdImage redove, ali Supabase fajlovi ostaju)
-
-**Preporuka:** Implementirati periodic ili event-driven cleanup: brisati Supabase fajlove kad se obriše oglas; eventualno TTL/prefix za neiskorištene upload-e. Nije urađeno u ovom ciklusu (zahtijeva refaktorizaciju).
+- **Brisanje oglasa:** `DELETE /my/:id` i adLifecycle sada brišu slike iz Supabase Storage prije Prisma delete.
+- **Orphan tmp uploadi:** `npm run cleanup:orphan-tmp` (CLEANUP_ORPHAN_TMP_ENABLED=true, TMP_MAX_AGE_HOURS=24) briše tmp fajlove starije od 24h koje korisnik nije priložio oglasu.
 
 ---
 

@@ -79,7 +79,7 @@ Kada završiš backend/security/SEO, možeš se fokusirati na:
 - Pristupačnost: kontrast, fokus, aria oznake
 - Loading skeletoni i mikro-interakcije (već imaš skeleton za listu oglasa)
 - Dark theme – već imaš; opciono light theme toggle
-- Stranica “Moji oglasi” – trenutno placeholder; dovršiti listu, akcije (uredi, obriši, status)
+- Stranica “Moji oglasi” – ✅ implementirano (lista, uređivanje, brisanje, status)
 - Stranica pojedinačnog oglasa – galerija, CTA, dio za poruke
 - Forme (objavi oglas, registracija) – jasne poruke o greškama, validacija u realnom vremenu
 
@@ -104,7 +104,7 @@ Kada završiš backend/security/SEO, možeš se fokusirati na:
 10. ✅ **Paginacija** – `GET /api/ads` vraća `{ ads, total, page, limit }`; podržani query parametri `page` i `limit`.
 
 ### Faza D – Dizajn i nove stvari
-11. Dovršiti “Moji oglasi”, pojedinačni oglas, forme.
+11. ✅ “Moji oglasi”, pojedinačni oglas, forme – implementirano.
 12. Sve što želiš dodati (nove kategorije, filteri, poruke, itd.) – to možemo planirati posebno.
 
 ---

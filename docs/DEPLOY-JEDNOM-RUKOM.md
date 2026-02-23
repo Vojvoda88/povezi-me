@@ -11,7 +11,7 @@ Kod je spreman: u rootu su **render.yaml** (backend) i **vercel.json** (frontend
 Ako već nemaš:
 
 ```bash
-cd "c:\Users\Jovan\Desktop\Sve novo"
+cd "c:\Users\Jovan\Desktop\PoveziME"
 git init
 git add .
 git commit -m "Ready for deploy"

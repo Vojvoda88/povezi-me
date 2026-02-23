@@ -16,7 +16,7 @@
 Otvori **PowerShell** ili **Command Prompt** u mapi projekta i uradi:
 
 ```bash
-cd "c:\Users\Jovan\Desktop\Sve novo"
+cd "c:\Users\Jovan\Desktop\PoveziME"
 
 git add src/middleware/auth.ts src/routes/ads.ts App.tsx
 git status

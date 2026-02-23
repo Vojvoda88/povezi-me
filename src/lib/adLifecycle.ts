@@ -6,6 +6,7 @@
 
 import prisma from './prisma';
 import { getSupabase, BUCKET_ADS } from './supabase';
+import { deleteAdImagesFromStorage } from './storage';
 import { createNotification } from './notifications';
 import { cleanupOldThrottles } from './viewThrottleDb';
 
@@ -40,20 +41,7 @@ export async function runAdLifecycleCheck(): Promise<void> {
         where: { id: ad.id },
         data: { deletedAt: now, status: 'ISTEKAO' },
       });
-      // Delete images from storage
-      const supabase = getSupabase();
-      if (supabase && ad.images?.length) {
-        for (const img of ad.images) {
-          try {
-            const path = img.url?.includes('/storage/v1/object/public/') ? extractStoragePath(img.url) : null;
-            if (path) {
-              await supabase.storage.from(BUCKET_ADS).remove([path]);
-            }
-          } catch {
-            // ignore storage errors
-          }
-        }
-      }
+      await deleteAdImagesFromStorage(getSupabase(), BUCKET_ADS, ad.images);
       await prisma.adImage.deleteMany({ where: { adId: ad.id } });
     }
 
@@ -163,18 +151,8 @@ export async function runAdLifecycleCheck(): Promise<void> {
     let imagesDeletedCount = 0;
     for (const ad of toHardDelete) {
       try {
-        const supabase = getSupabase();
-        if (supabase && ad.images?.length) {
-          for (const img of ad.images) {
-            try {
-              const path = img.url?.includes('/storage/v1/object/public/') ? extractStoragePath(img.url) : null;
-              if (path) {
-                await supabase.storage.from(BUCKET_ADS).remove([path]);
-                imagesDeletedCount++;
-              }
-            } catch { /* ignore */ }
-          }
-        }
+        await deleteAdImagesFromStorage(getSupabase(), BUCKET_ADS, ad.images);
+        imagesDeletedCount += ad.images?.length ?? 0;
         await prisma.ad.delete({ where: { id: ad.id } });
         hardDeletedCount++;
       } catch {
@@ -197,15 +175,3 @@ export async function runAdLifecycleCheck(): Promise<void> {
   }
 }
 
-function extractStoragePath(url: string): string | null {
-  try {
-    // URL: .../object/public/ads/userId/uuid.ext -> path within bucket: userId/uuid.ext
-    const match = url.match(/\/object\/public\/[^/]+\/(.+)$/);
-    if (!match) return null;
-    const full = decodeURIComponent(match[1]);
-    const prefix = BUCKET_ADS + '/';
-    return full.startsWith(prefix) ? full.slice(prefix.length) : full;
-  } catch {
-    return null;
-  }
-}

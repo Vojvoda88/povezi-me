@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import * as PrismaClientModule from '@prisma/client';
 import prisma from '../lib/prisma';
 import { getSupabase, BUCKET_ADS } from '../lib/supabase';
-import { extractStoragePath, cleanupTmpUploads } from '../lib/storage';
+import { extractStoragePath, cleanupTmpUploads, deleteAdImagesFromStorage } from '../lib/storage';
 import { sanitizeHTML } from '../lib/sanitize';
 import { authenticate, optionalAuthenticate } from '../middleware/auth';
 import { verifyCaptcha } from '../lib/captcha';
@@ -689,9 +689,10 @@ router.delete('/my/:id', authenticate as any, (async (req: Request, res: Respons
   if (!userId) return s.status(401).json({ error: 'Niste autentifikovani' });
   if (!adId) return s.status(400).json({ error: 'ID oglasa je obavezan' });
   try {
-    const ad = await prisma.ad.findUnique({ where: { id: adId } });
+    const ad = await prisma.ad.findUnique({ where: { id: adId }, include: { images: true } });
     if (!ad) return s.status(404).json({ error: 'Oglas nije pronađen' });
     if (ad.vlasnikId !== userId) return s.status(403).json({ error: 'Niste vlasnik ovog oglasa' });
+    await deleteAdImagesFromStorage(getSupabase(), BUCKET_ADS, ad.images);
     await prisma.ad.delete({ where: { id: adId } });
     s.status(204).end();
   } catch (err) {

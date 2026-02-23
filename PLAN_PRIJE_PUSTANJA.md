@@ -20,10 +20,10 @@ Kompletan izvještaj šta je urađeno, šta nedostaje i u kojim fazama raditi da
 
 | # | Stavka | Status | Opis |
 |---|--------|--------|------|
-| 1.1 | **Objavi oglas → API** | ❌ | Forma „Objavi oglas” trenutno samo dodaje oglas u lokalni state. Treba slati **POST /api/ads** sa naslov, opis, cijena, kategorija, lokacija, potkategorija, tipOglasa, details (nekretnine/auto dijelovi), i nakon uspjeha osvježiti listu i preusmjeriti. |
-| 1.2 | **Validacija forme** | ❌ | Obavezna polja (naslov, opis, cijena, lokacija, kategorija, telefon), za nekretnine tip nekretnine; prikaz grešaka ispod polja ili na vrhu; backend već vraća 400 sa porukama – frontend ih prikazati. |
-| 1.3 | **Slike** | ❌ | Backend očekuje `images: string[]` (URL-ovi). Trenutno su samo lokalni blob URL-ovi. Opcije: (A) Integracija uploada (npr. Supabase Storage) pa slanje URL-ova u POST; (B) Privremeno slati prazan niz i prikazati poruku „Dodajte slike putem linkova” ili kasnije upload. Za prvu objavu minimalno: ne blokirati submit, slati `images: []` ili jedan placeholder URL dok se ne uvede upload. |
-| 1.4 | **Kontakt na oglasu** | ⚠️ | Forma šalje telefon/ime; backend u Ad nema kontaktIme/kontaktTelefon – vjerovatno iz vlasnika (User). Provjeriti da li API vraća vlasnik.ime/telefon na GET /ads i GET /ads/:slug i da se to prikazuje na kartici i detalju. |
+| 1.1 | **Objavi oglas → API** | ✅ | POST /api/ads; osvježavanje liste i preusmjeravanje nakon uspjeha. |
+| 1.2 | **Validacija forme** | ✅ | Obavezna polja; prikaz grešaka; backend 400 sa porukama. |
+| 1.3 | **Slike** | ✅ | Supabase Storage upload; frontend šalje URL-ove u POST; optimizacija na backendu. |
+| 1.4 | **Kontakt na oglasu** | ✅ | API vraća vlasnik.ime/telefon na GET /ads/:slug; prikazuje se na kartici i detalju. |
 
 **Ishod Faze 1:** Korisnik može objaviti oglas koji stvarno završi u bazi; vidi potvrdu ili grešku; lista i detalj rade sa podacima iz API-ja.
 

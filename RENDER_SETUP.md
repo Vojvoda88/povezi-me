@@ -19,10 +19,21 @@ Za `express-rate-limit` iza reversa proxy-ja. Ako vidiš `ERR_ERL_UNEXPECTED_X_F
 
 **Greška:** `max clients reached - in Session mode max clients are limited to pool_size`
 
-Za Supabase/Neon dodaj ograničenje u `DATABASE_URL`:
+Aplikacija radi, ali admin stats i ostale stranice mogu vraćati DB greške. Supabase Session mode ima limit (~15 konekcija). Prisma drži previše konekcija.
 
+**Rješenje – u Render Dashboardu:**
+
+1. **Dashboard** → tvoj **Web Service** → **Environment**
+2. Pronađi `DATABASE_URL`
+3. Na kraj URL-a dodaj `?connection_limit=5` (ako već ima `?`, koristi `&connection_limit=5`)
+
+**Primjer:**
 ```
-postgresql://user:pass@host/db?connection_limit=5
+# Prije (Supabase Direct – port 5432):
+postgresql://postgres.xxx:pass@aws-1-eu-central-1.pooler.supabase.com:5432/postgres
+
+# Poslije:
+postgresql://postgres.xxx:pass@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?connection_limit=5
 ```
 
-Ili za Supabase transaction pooler koristi Pooler URL (port 6543) umjesto direktnog (5432).
+**Alternativa:** Koristi Supabase **Transaction pooler** (port 6543) umjesto Session (5432) – u Supabase Dashboardu → Project Settings → Database → Connection string (Transaction).

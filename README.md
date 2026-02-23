@@ -11,7 +11,7 @@ Marketplace za kupovinu i prodaju (automobili, motocikli, nekretnine, tehnika it
 
 1. Kloniraj repozitorijum i uđi u folder:
    ```bash
-   cd "Sve novo"
+   cd PoveziME
    npm install
    ```
 
@@ -80,6 +80,8 @@ npm run db:migrate     # primijeni migracije
 | `npm run deploy:check`| Provjera prije deploya (gitignore, migracije, build) |
 | `npm run deploy:jwt`  | Generiši siguran JWT_SECRET za produkciju |
 | `npm run smoke-test`  | Brzi smoke-test API-ja (`/health`, `/api/ads`, detalj oglasa) |
+| `npm run cleanup`     | Cleanup soft-deleted ads (CLEANUP_ENABLED=true, vidi scripts) |
+| `npm run cleanup:orphan-tmp` | Briše orphan tmp upload-e iz Supabase (CLEANUP_ORPHAN_TMP_ENABLED=true) |
 | `npm run ci`      | Lokalni CI: testovi, smoke-test, build backend + frontend |
 | `npm run e2e`     | Playwright E2E testovi (vidi ispod: fiksni port 5175) |
 
