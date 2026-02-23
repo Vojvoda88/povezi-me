@@ -1485,33 +1485,37 @@ const Marketplace: React.FC<{
       </div>
 
       {saveSearchModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 pt-8 pb-[env(safe-area-inset-bottom,1rem)] sm:pb-4 bg-black/60" onClick={() => !saveSearchLoading && setSaveSearchModalOpen(false)}>
-          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto p-6 rounded-2xl border shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-black uppercase text-white mb-2">Spremi pretragu</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Naziv je opcionalan. Obavijestićemo vas kad se pojavi novi oglas koji odgovara.</p>
-            <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. Stanovi Podgorica do 500€" className="w-full h-14 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-white placeholder-[#6B7280] mb-4 text-base" />
-            {saveSearchError && <p className="text-red-400 text-sm mb-4">{saveSearchError}</p>}
-            <div className="flex gap-3">
-              <button type="button" disabled={saveSearchLoading} onClick={() => setSaveSearchModalOpen(false)} className="flex-1 min-h-[44px] rounded-xl border font-bold uppercase text-sm" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
-              <button type="button" disabled={saveSearchLoading} onClick={async () => {
-                setSaveSearchError('');
-                setSaveSearchLoading(true);
-                try {
-                  const res = await fetch(`${API_BASE}/saved-searches`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-                    body: JSON.stringify({ naziv: saveSearchNaziv.trim() || null, query: buildQueryForSave() }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok) { setSaveSearchError(data?.error || 'Greška pri spremanju.'); return; }
-                  setSaveSearchModalOpen(false);
-                  setSaveSearchNaziv('');
-                  navigate('/moje-spremljene-pretrage');
-                } catch { setSaveSearchError('Greška u mreži.'); } finally { setSaveSearchLoading(false); }
-              }} className="flex-1 min-h-[44px] rounded-xl font-bold uppercase text-sm flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
+        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 bg-black/60" onClick={() => !saveSearchLoading && setSaveSearchModalOpen(false)}>
+          <div className="w-full max-w-md max-h-[min(90vh,85dvh)] flex flex-col rounded-2xl border shadow-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={e => e.stopPropagation()}>
+            <form id="save-search-form" className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col" onSubmit={async (e) => {
+              e.preventDefault();
+              setSaveSearchError('');
+              setSaveSearchLoading(true);
+              try {
+                const res = await fetch(`${API_BASE}/saved-searches`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                  body: JSON.stringify({ naziv: saveSearchNaziv.trim() || null, query: buildQueryForSave() }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) { setSaveSearchError(data?.error || 'Greška pri spremanju.'); return; }
+                setSaveSearchModalOpen(false);
+                setSaveSearchNaziv('');
+                navigate('/moje-spremljene-pretrage');
+              } catch { setSaveSearchError('Greška u mreži.'); } finally { setSaveSearchLoading(false); }
+            }}><div className="p-6">
+                <h3 className="text-lg font-black uppercase text-white mb-2">Spremi pretragu</h3>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Naziv je opcionalan. Obavijestićemo vas kad se pojavi novi oglas koji odgovara.</p>
+                <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. Stanovi Podgorica do 500€" className="w-full h-14 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-white placeholder-[#6B7280] mb-4 text-base" autoComplete="off" />
+                {saveSearchError && <p className="text-red-400 text-sm mb-4">{saveSearchError}</p>}
+              </div>
+              <div className="sticky bottom-0 left-0 right-0 flex gap-3 p-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] -mt-2" style={{ backgroundColor: 'var(--bg-card)' }}>
+              <button type="button" disabled={saveSearchLoading} onClick={() => setSaveSearchModalOpen(false)} className="flex-1 min-h-[48px] rounded-xl border font-bold uppercase text-sm" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>Odustani</button>
+              <button type="submit" disabled={saveSearchLoading} className="flex-1 min-h-[48px] rounded-xl font-bold uppercase text-sm flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
                 {saveSearchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Spremi'}
               </button>
             </div>
+          </form>
           </div>
         </div>
       )}
