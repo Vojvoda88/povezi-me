@@ -1485,7 +1485,7 @@ const Marketplace: React.FC<{
       </div>
 
       {saveSearchModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center p-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 bg-black/60" onClick={() => !saveSearchLoading && setSaveSearchModalOpen(false)}>
+        <div className="fixed inset-0 z-[100010] flex items-end sm:items-center justify-center p-4 pt-8 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 bg-black/60" onClick={() => !saveSearchLoading && setSaveSearchModalOpen(false)}>
           <div className="w-full max-w-md max-h-[min(90vh,85dvh)] flex flex-col rounded-2xl border shadow-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-subtle)' }} onClick={e => e.stopPropagation()}>
             <form id="save-search-form" className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col" onSubmit={async (e) => {
               e.preventDefault();
@@ -1504,9 +1504,9 @@ const Marketplace: React.FC<{
                 navigate('/moje-spremljene-pretrage');
               } catch { setSaveSearchError('Greška u mreži.'); } finally { setSaveSearchLoading(false); }
             }}><div className="p-6">
-                <h3 className="text-lg font-black uppercase text-white mb-2">Spremi pretragu</h3>
+                <h3 className="text-lg font-black uppercase mb-2" style={{ color: 'var(--text-primary)' }}>Spremi pretragu</h3>
                 <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>Naziv je opcionalan. Obavijestićemo vas kad se pojavi novi oglas koji odgovara.</p>
-                <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. Stanovi Podgorica do 500€" className="w-full h-14 bg-[#0B1220] border border-white/10 rounded-xl px-4 text-white placeholder-[#6B7280] mb-4 text-base" autoComplete="off" />
+                <input type="text" value={saveSearchNaziv} onChange={e => setSaveSearchNaziv(e.target.value)} placeholder="npr. Stanovi Podgorica do 500€" className="w-full h-14 rounded-xl px-4 mb-4 text-base" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }} autoComplete="off" />
                 {saveSearchError && <p className="text-red-400 text-sm mb-4">{saveSearchError}</p>}
               </div>
               <div className="sticky bottom-0 left-0 right-0 flex gap-3 p-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] -mt-2" style={{ backgroundColor: 'var(--bg-card)' }}>
@@ -3404,7 +3404,7 @@ const Notifications = ({ notifications, onMarkRead, onRefresh }: { notifications
   };
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6 animate-slide-up">
-      <h1 className="text-2xl font-black text-white uppercase tracking-widest">Obavještenja</h1>
+      <h1 className="text-2xl font-black uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>Obavještenja</h1>
       <div className="space-y-3">
         {notifications.length === 0 ? (
           <EmptyState variant="no-notifications" />
@@ -3412,18 +3412,18 @@ const Notifications = ({ notifications, onMarkRead, onRefresh }: { notifications
           notifications.map((n: Notification) => {
             const isDeletion = n.tip === 'AD_DELETION_7D' || n.tip === 'AD_DELETION_3D';
             return (
-              <div key={n.id} onClick={() => handleNotificationClick(n)} className={`p-5 rounded-xl border flex gap-4 items-start cursor-pointer transition-all ${n.procitano ? 'bg-[#131C2B] border-white/5 opacity-60' : 'bg-[#162235] border-[#4F6DFF]/30 hover:scale-[1.01]'}`}>
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-[#4F6DFF]/20 text-[#4F6DFF]">
+              <div key={n.id} onClick={() => handleNotificationClick(n)} className={`p-5 rounded-xl border flex gap-4 items-start cursor-pointer transition-all ${n.procitano ? 'opacity-60' : 'hover:scale-[1.01]'}`} style={{ backgroundColor: 'var(--bg-card)', borderColor: n.procitano ? 'var(--border-subtle)' : 'var(--accent)' }}>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-[var(--accent)]/20" style={{ color: 'var(--accent)' }}>
                   <Bell className="w-5 h-5" />
                 </div>
                 <div className="flex-grow min-w-0 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-white font-bold text-sm">{n.naslov}</span>
-                      <span className="text-[10px] text-[#9CA3AF] shrink-0 ml-2">{n.createdAt ? formatRelativeTime(n.createdAt) : ''}</span>
+                      <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{n.naslov}</span>
+                      <span className="text-[10px] shrink-0 ml-2" style={{ color: 'var(--text-secondary)' }}>{n.createdAt ? formatRelativeTime(n.createdAt) : ''}</span>
                     </div>
                   </div>
-                  <div className="text-xs text-[#9CA3AF] leading-relaxed">{n.poruka}</div>
+                  <div className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{n.poruka}</div>
                   {isDeletion && n.entityId && (
                     <button
                       type="button"
